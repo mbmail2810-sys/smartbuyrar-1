@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/grocery_list.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/list_providers.dart';
@@ -15,104 +16,103 @@ class ShareListBottomSheet extends ConsumerStatefulWidget {
 }
 
 class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
-  final _emailController = TextEditingController();
   MemberRole _selectedRole = MemberRole.editor;
   bool _isLoading = false;
   String? _inviteLink;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
+  Future<String> _getOrCreateInviteLink() async {
+    if (_inviteLink != null) return _inviteLink!;
+    
+    final user = ref.read(authStateProvider).value;
+    if (user == null) {
+      throw Exception('Please sign in to share lists');
+    }
+    
+    final repo = ref.read(listRepositoryProvider);
+    
+    final inviteId = await repo.createInvite(
+      listId: widget.list.id,
+      listTitle: widget.list.title,
+      createdBy: user.uid,
+      role: _selectedRole.name,
+    );
+    
+    final link = "https://smartbuy.app/invite/$inviteId";
+    if (mounted) {
+      setState(() => _inviteLink = link);
+    } else {
+      _inviteLink = link;
+    }
+    return link;
   }
 
-  Future<void> _createInvite() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an email address')),
-      );
-      return;
-    }
-
+  Future<void> _shareViaWhatsApp() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      final user = ref.read(authStateProvider).value!;
-      final repo = ref.read(listRepositoryProvider);
+      final link = await _getOrCreateInviteLink();
+      final message = "Join my grocery list '${widget.list.title}' on SmartBuy!\n\n$link";
+      final encodedMessage = Uri.encodeComponent(message);
+      final whatsappUrl = Uri.parse("https://wa.me/?text=$encodedMessage");
       
-      final inviteId = await repo.createInviteWithEmail(
-        listId: widget.list.id,
-        listTitle: widget.list.title,
-        createdBy: user.uid,
-        invitedUserEmail: email,
-        role: _selectedRole.name,
-      );
-
-      final link = "smartbuy://invite/$inviteId";
-      setState(() {
-        _inviteLink = link;
-        _isLoading = false;
-      });
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invite created successfully!')),
+          const SnackBar(
+            content: Text('Invite link created successfully!'),
+            backgroundColor: Color(0xFF00B200),
+          ),
+        );
+      }
+      
+      try {
+        final launched = await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+        if (!launched && mounted) {
+          await Clipboard.setData(ClipboardData(text: link));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('WhatsApp not available. Link copied to clipboard!')),
+          );
+        }
+      } catch (_) {
+        await Clipboard.setData(ClipboardData(text: link));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Link copied to clipboard! Share it manually.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating invite: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _copyInviteLink() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    
+    try {
+      final link = await _getOrCreateInviteLink();
+      await Clipboard.setData(ClipboardData(text: link));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invite link copied to clipboard!')),
         );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
       }
-    }
-  }
-
-  Future<void> _copyInviteLink() async {
-    if (_inviteLink == null) {
-      final user = ref.read(authStateProvider).value!;
-      final repo = ref.read(listRepositoryProvider);
-      
-      setState(() => _isLoading = true);
-      
-      try {
-        final inviteId = await repo.createInvite(
-          listId: widget.list.id,
-          listTitle: widget.list.title,
-          createdBy: user.uid,
-          role: _selectedRole.name,
-        );
-        
-        final link = "smartbuy://invite/$inviteId";
-        await Clipboard.setData(ClipboardData(text: link));
-        
-        setState(() {
-          _inviteLink = link;
-          _isLoading = false;
-        });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invite link copied to clipboard!')),
-          );
-        }
-      } catch (e) {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
-    } else {
-      await Clipboard.setData(ClipboardData(text: _inviteLink!));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Link copied to clipboard!')),
-        );
-      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -135,36 +135,22 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
             children: [
               const Icon(Icons.share, color: Color(0xFF00B200)),
               const SizedBox(width: 10),
-              Text(
-                'Share "${widget.list.title}"',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'Share "${widget.list.title}"',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
 
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              hintText: 'Enter email address',
-              prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF00B200), width: 2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
           const Text(
-            'Select Role',
+            'Select Role for Invited User',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
           const SizedBox(height: 8),
@@ -178,7 +164,10 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                   description: 'Can add, edit, delete items',
                   icon: Icons.edit,
                   isSelected: _selectedRole == MemberRole.editor,
-                  onTap: () => setState(() => _selectedRole = MemberRole.editor),
+                  onTap: () => setState(() {
+                    _selectedRole = MemberRole.editor;
+                    _inviteLink = null;
+                  }),
                 ),
               ),
               const SizedBox(width: 12),
@@ -189,52 +178,54 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                   description: 'Can only view items',
                   icon: Icons.visibility,
                   isSelected: _selectedRole == MemberRole.viewer,
-                  onTap: () => setState(() => _selectedRole = MemberRole.viewer),
+                  onTap: () => setState(() {
+                    _selectedRole = MemberRole.viewer;
+                    _inviteLink = null;
+                  }),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _copyInviteLink,
-                  icon: const Icon(Icons.link),
-                  label: const Text('Copy Link'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: Color(0xFF00B200)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : _shareViaWhatsApp,
+              icon: _isLoading 
+                ? const SizedBox(
+                    width: 20, 
+                    height: 20, 
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                  )
+                : const Icon(Icons.chat, size: 22),
+              label: const Text('Share via WhatsApp', style: TextStyle(fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _createInvite,
-                  icon: _isLoading 
-                    ? const SizedBox(
-                        width: 16, 
-                        height: 16, 
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
-                      )
-                    : const Icon(Icons.send),
-                  label: const Text('Send Invite'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B200),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isLoading ? null : _copyInviteLink,
+              icon: const Icon(Icons.link),
+              label: const Text('Copy Invite Link'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: const BorderSide(color: Color(0xFF00B200)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
 

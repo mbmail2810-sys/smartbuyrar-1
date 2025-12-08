@@ -33,7 +33,7 @@ The app runs automatically via the configured workflow which serves the built Fl
 - Insights and analytics
 - Offline support with sync
 - **Real-Time Sharing & Collaboration**
-  - Share lists via email invitations
+  - Share lists via WhatsApp with invite links
   - Three-tier role system: Owner, Editor, Viewer
   - Role-based access control (owners can share, editors can modify, viewers read-only)
   - Real-time sync for collaborative shopping
@@ -41,10 +41,11 @@ The app runs automatically via the configured workflow which serves the built Fl
 ## Recent Changes
 - December 8, 2025: Real-Time Sharing & Collaboration
   - Added MemberRole enum with owner/editor/viewer roles
-  - Created ShareListBottomSheet widget for email-based invites
+  - Created ShareListBottomSheet widget with WhatsApp sharing
   - Implemented role validation at service and repository layers
   - Added role-based UI controls in lists and list detail screens
   - Updated acceptInvite to write normalized roles back to documents
+  - Changed sharing from email to WhatsApp with shareable invite links
 
 - December 8, 2025: Initial setup on Replit
   - Extracted project from archive
