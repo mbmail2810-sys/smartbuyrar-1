@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../services/pantry_service.dart';
 import '../../services/pantry_ai.dart';
@@ -32,77 +33,335 @@ class PantryScreen extends ConsumerWidget {
     return StreamBuilder(
       stream: PantryService.pantryStream(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const CircularProgressIndicator();
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         final items = snapshot.data!.docs;
 
         if (items.isEmpty) {
-          return const Center(child: Text("Your pantry is empty"));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.kitchen, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  "Your pantry is empty",
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Tap + to add items",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
-        return ListView(
-          children: items.map((doc) {
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final doc = items[index];
             final data = doc.data() as Map<String, dynamic>;
-            final analysis = PantryAI.analyzePantryItem(data);
-            final itemName = data["item"] as String;
-            final quantity = data["quantity"] as int;
-            final expiresAtTimestamp = data["expiresAt"] as Timestamp?;
-            final lowStockThreshold = data["lowStockThreshold"] as int? ?? 2;
+            return _buildPantryCard(context, ref, data);
+          },
+        );
+      },
+    );
+  }
 
-            DateTime? expiresAt = expiresAtTimestamp?.toDate();
+  Widget _buildPantryCard(BuildContext context, WidgetRef ref, Map<String, dynamic> data) {
+    final analysis = PantryAI.analyzePantryItem(data);
+    final itemName = data["item"] as String;
+    final quantity = data["quantity"] as int;
+    final expiresAtTimestamp = data["expiresAt"] as Timestamp?;
+    final lowStockThreshold = data["lowStockThreshold"] as int? ?? 2;
+    final needsRestock = analysis["needsRestock"] as bool;
 
-            return ListTile(
-              onTap: () => _showPantryItemDialog(
-                context,
-                ref,
-                itemName: itemName,
-                quantity: quantity,
-                expiresAt: expiresAt,
-                lowStockThreshold: lowStockThreshold,
-                isEdit: true,
-              ),
-              title: Text(itemName),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    DateTime? expiresAt = expiresAtTimestamp?.toDate();
+    
+    final bool isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
+    final bool isExpiringSoon = expiresAt != null && 
+        !isExpired && 
+        expiresAt.difference(DateTime.now()).inDays <= 3;
+    final bool isLowStock = needsRestock;
+    final bool isOutOfStock = quantity <= 0;
+
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+    Color cardBorderColor;
+
+    if (isOutOfStock) {
+      statusColor = Colors.red;
+      statusText = 'Out of stock';
+      statusIcon = Icons.error;
+      cardBorderColor = Colors.red;
+    } else if (isExpired) {
+      statusColor = Colors.red;
+      statusText = 'Expired';
+      statusIcon = Icons.error;
+      cardBorderColor = Colors.red;
+    } else if (isExpiringSoon) {
+      statusColor = Colors.orange;
+      statusText = 'Expiring soon';
+      statusIcon = Icons.warning;
+      cardBorderColor = Colors.orange;
+    } else if (isLowStock) {
+      statusColor = Colors.amber.shade700;
+      statusText = 'Low stock';
+      statusIcon = Icons.inventory_2;
+      cardBorderColor = Colors.amber;
+    } else {
+      statusColor = Colors.green;
+      statusText = 'Well stocked';
+      statusIcon = Icons.check_circle;
+      cardBorderColor = Colors.green;
+    }
+
+    final double stockPercentage = lowStockThreshold > 0 
+        ? (quantity / (lowStockThreshold * 3)).clamp(0.0, 1.0)
+        : 1.0;
+
+    return GestureDetector(
+      onTap: () => _showPantryItemDialog(
+        context,
+        ref,
+        itemName: itemName,
+        quantity: quantity,
+        expiresAt: expiresAt,
+        lowStockThreshold: lowStockThreshold,
+        isEdit: true,
+      ),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: cardBorderColor.withOpacity(0.4),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
                 children: [
-                  Text("Qty: $quantity — ${analysis["status"]}"),
-                  if (expiresAt != null)
-                    Text("Expires: ${DateFormat("yyyy-MM-dd").format(expiresAt)}"),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(statusIcon, color: statusColor, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          itemName,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                            if (expiresAt != null) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.event,
+                                size: 14,
+                                color: isExpired || isExpiringSoon ? statusColor : Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatExpiryDate(expiresAt),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: isExpired || isExpiringSoon ? statusColor : Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '$quantity',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        quantity == 1 ? 'unit' : 'units',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: stockPercentage,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation(statusColor),
+                  minHeight: 4,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  analysis["needsRestock"]
-                      ? const Icon(Icons.warning, color: Colors.orange)
-                      : const Icon(Icons.check_circle, color: Colors.green),
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
+                  _actionButton(
+                    icon: Icons.remove_circle_outline,
+                    label: 'Use',
+                    color: Colors.grey[700]!,
                     onPressed: () async {
-                      await PantryService.consumeItem(data["item"] as String);
+                      await PantryService.consumeItem(itemName);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text("Consumed ${data["item"]}"),
+                          content: Text("Used 1 $itemName"),
                           duration: const Duration(seconds: 1),
                         ),
                       );
                     },
                   ),
-                  if (analysis["needsRestock"])
-                    IconButton(
-                      icon: const Icon(Icons.add_shopping_cart),
-                      onPressed: () async {
-                        _showGroceryListSelectionDialog(context, ref, data);
-                      },
+                  if (needsRestock) ...[
+                    const SizedBox(width: 8),
+                    _actionButton(
+                      icon: Icons.add_shopping_cart,
+                      label: 'Restock',
+                      color: Colors.blue,
+                      onPressed: () => _showGroceryListSelectionDialog(context, ref, data),
                     ),
+                  ],
                 ],
               ),
-            );
-          }).toList(),
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatExpiryDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiryDay = DateTime(date.year, date.month, date.day);
+    final diff = expiryDay.difference(today).inDays;
+    
+    if (diff < 0) return '${-diff}d ago';
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Tomorrow';
+    if (diff <= 7) return 'In $diff days';
+    
+    return DateFormat('MMM d').format(date);
   }
 
   void _showPantryItemDialog(
@@ -134,7 +393,7 @@ class PantryScreen extends ConsumerWidget {
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(labelText: "Item Name"),
-                      enabled: !isEdit, // Item name cannot be edited
+                      enabled: !isEdit,
                     ),
                     TextField(
                       controller: qtyController,
@@ -243,11 +502,11 @@ class PantryScreen extends ConsumerWidget {
                             name: itemData["item"],
                             description: "Restock from pantry",
                             price: 0.0,
-                            quantity: 1, // Default quantity for restock
-                            category: "General", // Or try to infer category
+                            quantity: 1,
+                            category: "General",
                             checked: false,
                             createdAt: DateTime.now(),
-                            createdBy: list.ownerId, // Or current user id
+                            createdBy: list.ownerId,
                           );
 
                           await ref
@@ -264,7 +523,6 @@ class PantryScreen extends ConsumerWidget {
                       )),
                   TextButton(
                     onPressed: () {
-                      // Option to create a new list, if desired.
                       Navigator.of(dialogContext).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Create new list functionality not yet implemented.")),

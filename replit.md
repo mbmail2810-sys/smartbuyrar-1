@@ -58,8 +58,16 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Atomic purchase logging with FieldValue.arrayUnion for collaboration
 
 ## Recent Changes
-- December 8, 2025: Pantry Consumption Forecast & Bug Fixes
-  - Redesigned Pantry Consumption Forecast section with rich cards showing:
+- December 8, 2025: Pantry Screen Enhancement & Bug Fixes
+  - Completely redesigned Pantry Stock screen with color-coded cards:
+    - Visual quantity display with color-coded badges (green/amber/orange/red)
+    - Status indicators: Well stocked, Low stock, Expiring soon, Expired, Out of stock
+    - Stock level progress bar showing current quantity vs threshold
+    - Expiration date display with friendly relative formatting
+    - Color-coded card borders for quick status identification
+    - Action buttons for "Use" and "Restock" with improved UX
+    - Empty state with helpful messaging
+  - Redesigned Pantry Consumption Forecast in Insights with rich cards showing:
     - Item name and current quantity
     - Status badges (In stock, Low stock, Expiring soon, Expired)
     - Estimated days until item runs out based on consumption rate
