@@ -33,24 +33,7 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
 
     return Scaffold(
       appBar: AppBar(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          ),
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/icons/smartbuy_cart_green.png',
-              height: 28,
-              width: 28,
-            ),
-            const SizedBox(width: 8),
-            const Text('My Grocery List'),
-          ],
-        ),
+        title: const Text('SmartBuy'),
       ),
       drawer: Drawer(
         child: ListView(
