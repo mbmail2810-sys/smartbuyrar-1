@@ -345,24 +345,19 @@ class ListRepository {
 
   Future<void> _logPurchaseToList(String listId, GroceryItem item) async {
     final listRef = _firestore.listsRef.doc(listId);
-    final listDoc = await listRef.get();
-    final listData = listDoc.data() as Map<String, dynamic>?;
     
-    final purchaseLog = (listData?['purchaseLog'] as List<dynamic>?)
-            ?.map((e) => e as Map<String, dynamic>)
-            .toList() ??
-        [];
-    
-    purchaseLog.add({
+    final purchaseEntry = {
       'itemId': item.id,
       'itemName': item.name,
       'price': item.price ?? 0.0,
       'quantity': item.quantity,
       'total': (item.price ?? 0.0) * item.quantity,
       'date': DateTime.now().millisecondsSinceEpoch,
-    });
+    };
     
-    await listRef.update({'purchaseLog': purchaseLog});
+    await listRef.update({
+      'purchaseLog': FieldValue.arrayUnion([purchaseEntry])
+    });
   }
 
   Future<void> updateBudget(String listId, double newBudget) async {

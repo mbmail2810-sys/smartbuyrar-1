@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/grocery_list.dart';
 import '../models/grocery_item.dart';
@@ -9,6 +10,7 @@ import '../services/notification_service.dart';
 final _statusCache = <String, String>{};
 final _listLoaded = <String, bool>{};
 final _itemsLoaded = <String, bool>{};
+final _writeLock = <String, Completer<void>?>{};
 
 final budgetNotifierProvider =
     StateNotifierProvider.family<BudgetNotifier, AsyncValue<void>, String>(
@@ -71,7 +73,7 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
     );
   }
 
-  void _maybeNotify(GroceryList list) {
+  Future<void> _maybeNotify(GroceryList list) async {
     final currentStatus = getBudgetAlertStatus(list);
     final currentStr = currentStatus.name;
     final cached = _statusCache[_listId];
@@ -89,7 +91,23 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
       NotificationService().showBudgetExceededNotification(list.title, over);
     }
     
-    _listRepository.safeUpdateList(_listId, {'lastAlertStatus': currentStr});
+    await _writeStatusWithLock(currentStr);
+  }
+
+  Future<void> _writeStatusWithLock(String status) async {
+    final existingLock = _writeLock[_listId];
+    if (existingLock != null && !existingLock.isCompleted) {
+      await existingLock.future;
+    }
+    
+    final myLock = Completer<void>();
+    _writeLock[_listId] = myLock;
+    
+    try {
+      await _listRepository.safeUpdateList(_listId, {'lastAlertStatus': status});
+    } finally {
+      myLock.complete();
+    }
   }
 
   Future<void> _updateSpent(GroceryList list, {List<GroceryItem>? items}) async {
