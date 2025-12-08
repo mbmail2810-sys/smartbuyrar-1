@@ -325,6 +325,8 @@ class ListRepository {
       if (docData != null) {
         final item = GroceryItem.fromDoc(snapshot);
         await _analytics.logPurchase(item);
+        
+        await _logPurchaseToList(listId, item);
       }
 
       final usageLog = (docData?['usageLog'] as List<dynamic>?)
@@ -339,6 +341,28 @@ class ListRepository {
     }
     await itemRef.update(data);
     await _recalculateSpent(listId);
+  }
+
+  Future<void> _logPurchaseToList(String listId, GroceryItem item) async {
+    final listRef = _firestore.listsRef.doc(listId);
+    final listDoc = await listRef.get();
+    final listData = listDoc.data() as Map<String, dynamic>?;
+    
+    final purchaseLog = (listData?['purchaseLog'] as List<dynamic>?)
+            ?.map((e) => e as Map<String, dynamic>)
+            .toList() ??
+        [];
+    
+    purchaseLog.add({
+      'itemId': item.id,
+      'itemName': item.name,
+      'price': item.price ?? 0.0,
+      'quantity': item.quantity,
+      'total': (item.price ?? 0.0) * item.quantity,
+      'date': DateTime.now().millisecondsSinceEpoch,
+    });
+    
+    await listRef.update({'purchaseLog': purchaseLog});
   }
 
   Future<void> updateBudget(String listId, double newBudget) async {

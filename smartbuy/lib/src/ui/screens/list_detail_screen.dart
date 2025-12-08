@@ -123,6 +123,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
         slivers: [
           if (listAsync.value != null)
             SliverToBoxAdapter(child: _buildBudgetCard(context, listAsync.value!)),
+          SliverToBoxAdapter(child: _buildSpendingTrends(context)),
           if (itemsAsync.value != null)
             SliverToBoxAdapter(
               child: Padding(
@@ -865,5 +866,101 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
         );
       },
     );
+  }
+
+  Widget _buildSpendingTrends(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final trendsAsync = ref.watch(spendingTrendsProvider(widget.listId));
+        
+        return trendsAsync.when(
+          data: (trends) {
+            if (trends.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            
+            final maxAmount = trends.map((t) => t.amount).reduce((a, b) => a > b ? a : b);
+            
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.trending_up, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Spending Trends',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 100,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: trends.map((trend) {
+                          final barHeight = maxAmount > 0 
+                              ? (trend.amount / maxAmount) * 80 
+                              : 0.0;
+                          final dayName = _getDayName(trend.date.weekday);
+                          
+                          return Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '₹${trend.amount.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: barHeight.clamp(4.0, 80.0),
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  dayName,
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case 1: return 'Mon';
+      case 2: return 'Tue';
+      case 3: return 'Wed';
+      case 4: return 'Thu';
+      case 5: return 'Fri';
+      case 6: return 'Sat';
+      case 7: return 'Sun';
+      default: return '';
+    }
   }
 }

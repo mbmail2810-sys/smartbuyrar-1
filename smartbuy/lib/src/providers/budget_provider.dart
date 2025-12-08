@@ -4,9 +4,12 @@ import '../models/grocery_item.dart';
 import 'list_providers.dart';
 import 'item_providers.dart';
 import '../repositories/list_repository.dart';
+import '../services/notification_service.dart';
 
-// This provider will calculate the total spent for a grocery list
-// and manage budget alerts and control.
+final _statusCache = <String, String>{};
+final _listLoaded = <String, bool>{};
+final _itemsLoaded = <String, bool>{};
+
 final budgetNotifierProvider =
     StateNotifierProvider.family<BudgetNotifier, AsyncValue<void>, String>(
         (ref, listId) {
@@ -27,23 +30,66 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
   void _init() {
     _ref.listen<AsyncValue<GroceryList>>(
       groceryListProvider(_listId),
-      (_, next) {
+      (previous, next) {
         next.whenData((list) {
+          final wasLoaded = _listLoaded[_listId] == true;
+          _listLoaded[_listId] = true;
+          
+          if (!wasLoaded) {
+            final stored = list.lastAlertStatus;
+            _statusCache[_listId] = stored ?? getBudgetAlertStatus(list).name;
+            
+            if (stored == null) {
+              _listRepository.safeUpdateList(_listId, {'lastAlertStatus': _statusCache[_listId]!});
+            }
+            return;
+          }
+          
           _updateSpent(list);
+          _maybeNotify(list);
         });
       },
     );
 
     _ref.listen<AsyncValue<List<GroceryItem>>>(
       listItemsProvider(_listId),
-      (_, next) {
+      (previous, next) {
         next.whenData((items) {
+          final wasLoaded = _itemsLoaded[_listId] == true;
+          _itemsLoaded[_listId] = true;
+          
+          if (!wasLoaded || _listLoaded[_listId] != true) {
+            return;
+          }
+          
           _ref.read(groceryListProvider(_listId)).whenData((list) {
             _updateSpent(list, items: items);
+            _maybeNotify(list);
           });
         });
       },
     );
+  }
+
+  void _maybeNotify(GroceryList list) {
+    final currentStatus = getBudgetAlertStatus(list);
+    final currentStr = currentStatus.name;
+    final cached = _statusCache[_listId];
+    
+    if (cached == currentStr) return;
+    
+    _statusCache[_listId] = currentStr;
+    
+    if (currentStatus == BudgetAlertStatus.warning && 
+        cached != 'warning' && cached != 'exceeded') {
+      final pct = ((list.spent ?? 0) / (list.budget ?? 1)) * 100;
+      NotificationService().showBudgetWarningNotification(list.title, pct);
+    } else if (currentStatus == BudgetAlertStatus.exceeded && cached != 'exceeded') {
+      final over = (list.spent ?? 0) - (list.budget ?? 0);
+      NotificationService().showBudgetExceededNotification(list.title, over);
+    }
+    
+    _listRepository.safeUpdateList(_listId, {'lastAlertStatus': currentStr});
   }
 
   Future<void> _updateSpent(GroceryList list, {List<GroceryItem>? items}) async {
@@ -54,10 +100,12 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
 
       double newSpent = 0.0;
       for (var item in currentItems) {
-        newSpent += (item.price ?? 0.0) * item.quantity;
+        if (item.checked) {
+          newSpent += (item.price ?? 0.0) * item.quantity;
+        }
       }
 
-      if (newSpent != list.spent) {
+      if ((newSpent - (list.spent ?? 0)).abs() > 0.01) {
         await _listRepository.safeUpdateList(_listId, {'spent': newSpent});
       }
       state = const AsyncData(null);
@@ -66,10 +114,9 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  // Check if adding an item would exceed the budget with control enabled
   bool canAddItem(GroceryList list, double itemPrice, int itemQuantity) {
     if (!list.budgetControlEnabled || list.budget == null) {
-      return true; // No budget control or no budget set
+      return true;
     }
 
     final currentSpent = list.spent ?? 0.0;
@@ -78,7 +125,6 @@ class BudgetNotifier extends StateNotifier<AsyncValue<void>> {
     return potentialSpent <= list.budget!;
   }
 
-  // Get budget alert status
   BudgetAlertStatus getBudgetAlertStatus(GroceryList list) {
     if (list.budget == null || list.budget! <= 0) {
       return BudgetAlertStatus.noBudget;
@@ -104,18 +150,16 @@ enum BudgetAlertStatus {
   noBudget,
 }
 
-// Provider to get the current budget alert status for a list
 final currentBudgetAlertStatusProvider =
     Provider.family<BudgetAlertStatus, String>((ref, listId) {
   final listAsyncValue = ref.watch(groceryListProvider(listId));
   return listAsyncValue.when(
     data: (list) => ref.watch(budgetNotifierProvider(listId).notifier).getBudgetAlertStatus(list),
-    loading: () => BudgetAlertStatus.safe, // Default to safe while loading
-    error: (_, __) => BudgetAlertStatus.safe, // Default to safe on error
+    loading: () => BudgetAlertStatus.safe,
+    error: (_, __) => BudgetAlertStatus.safe,
   );
 });
 
-// Provider to check if adding an item is allowed
 final canAddItemProvider =
     Provider.family<bool, ({String listId, double itemPrice, int itemQuantity})>(
         (ref, args) {
@@ -124,7 +168,60 @@ final canAddItemProvider =
     data: (list) => ref
         .watch(budgetNotifierProvider(args.listId).notifier)
         .canAddItem(list, args.itemPrice, args.itemQuantity),
-    loading: () => true, // Allow adding while loading
-    error: (_, __) => true, // Allow adding on error
+    loading: () => true,
+    error: (_, __) => true,
   );
 });
+
+final spendingTrendsProvider = FutureProvider.family<List<SpendingTrend>, String>((ref, listId) async {
+  final list = await ref.watch(groceryListProvider(listId).future);
+  
+  final Map<String, double> dailySpending = {};
+  final now = DateTime.now();
+  
+  for (int i = 6; i >= 0; i--) {
+    final date = now.subtract(Duration(days: i));
+    final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    dailySpending[dateKey] = 0;
+  }
+  
+  final purchaseLog = list.purchaseLog ?? [];
+  for (final entry in purchaseLog) {
+    try {
+      final dateMs = entry['date'];
+      if (dateMs == null) continue;
+      
+      final int timestamp = dateMs is int ? dateMs : (dateMs as num).toInt();
+      final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      final daysDiff = now.difference(dateTime).inDays;
+      
+      if (daysDiff >= 0 && daysDiff < 7) {
+        final dateKey = '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+        final totalRaw = entry['total'];
+        final total = totalRaw is num ? totalRaw.toDouble() : 0.0;
+        dailySpending[dateKey] = (dailySpending[dateKey] ?? 0) + total;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  
+  final trends = dailySpending.entries.map((e) {
+    final parts = e.key.split('-');
+    return SpendingTrend(
+      date: DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2])),
+      amount: e.value,
+    );
+  }).toList();
+  
+  trends.sort((a, b) => a.date.compareTo(b.date));
+  
+  return trends;
+});
+
+class SpendingTrend {
+  final DateTime date;
+  final double amount;
+  
+  SpendingTrend({required this.date, required this.amount});
+}
