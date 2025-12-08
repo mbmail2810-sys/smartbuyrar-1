@@ -14,12 +14,31 @@ class HomeScreenRouter extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
+  int _currentIndex = 0;
+
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(themeModeProvider);
+    final currentLocation = GoRouterState.of(context).uri.toString();
+    
+    if (currentLocation.contains('/lists')) {
+      _currentIndex = 0;
+    } else if (currentLocation.contains('/insights')) {
+      _currentIndex = 1;
+    } else if (currentLocation.contains('/pantry')) {
+      _currentIndex = 2;
+    } else if (currentLocation.contains('/profile')) {
+      _currentIndex = 3;
+    }
 
     return Scaffold(
       appBar: AppBar(
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -53,7 +72,7 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
               title: const Text('Settings'),
               leading: const Icon(Icons.settings),
               onTap: () {
-                Navigator.pop(context); // close the drawer
+                Navigator.pop(context);
                 context.go('/settings');
               },
             ),
@@ -61,6 +80,49 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
         ),
       ),
       body: widget.child,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFF00B200),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          switch (index) {
+            case 0:
+              context.go('/lists');
+              break;
+            case 1:
+              context.go('/insights');
+              break;
+            case 2:
+              context.go('/pantry');
+              break;
+            case 3:
+              context.go('/profile');
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: 'Lists',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2),
+            label: 'Pantry',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
     );
   }
 }
