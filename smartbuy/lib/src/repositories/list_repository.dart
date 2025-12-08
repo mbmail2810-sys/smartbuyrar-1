@@ -349,6 +349,7 @@ class ListRepository {
     final purchaseEntry = {
       'itemId': item.id,
       'itemName': item.name,
+      'category': item.category,
       'price': item.price ?? 0.0,
       'quantity': item.quantity,
       'total': (item.price ?? 0.0) * item.quantity,

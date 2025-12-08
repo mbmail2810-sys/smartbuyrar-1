@@ -5,10 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:smartbuy/src/services/analytics_service.dart';
 import 'package:smartbuy/src/services/pantry_service.dart';
-import 'package:smartbuy/src/services/category_stats_service.dart'; // Import CategoryStatsService
-import 'package:fl_chart/fl_chart.dart'; // Import fl_chart
+import 'package:smartbuy/src/services/category_stats_service.dart';
+import 'package:smartbuy/src/providers/insights_provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 
-final categoryStatsServiceProvider = Provider((ref) => CategoryStatsService()); // Define provider
+final categoryStatsServiceProvider = Provider((ref) => CategoryStatsService());
 
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
@@ -19,6 +20,9 @@ class InsightsScreen extends ConsumerWidget {
     if (uid == null) {
       return const Center(child: Text("Not logged in"));
     }
+
+    final aggregatedSpending = ref.watch(aggregatedSpendingProvider);
+    final smartSuggestions = ref.watch(smartSpendSuggestionsProvider);
 
     final categoryStream = FirebaseFirestore.instance
         .collection('analytics')
@@ -32,6 +36,7 @@ class InsightsScreen extends ConsumerWidget {
         .collection('shoppingInsights')
         .doc('insights')
         .snapshots();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Insights"),
@@ -39,15 +44,70 @@ class InsightsScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(analyticsServiceProvider).resetAnalytics(),
+            onPressed: () {
+              ref.invalidate(aggregatedSpendingProvider);
+              ref.invalidate(smartSpendSuggestionsProvider);
+              ref.read(analyticsServiceProvider).resetAnalytics();
+            },
           ),
         ],
       ),
       body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _header("Smart Spend"),
+            const SizedBox(height: 8),
+            smartSuggestions.when(
+              data: (suggestions) => _buildSmartSpendSection(context, suggestions),
+              loading: () => const Center(child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              )),
+              error: (_, __) => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text("Unable to load suggestions"),
+              ),
+            ),
 
-            _header(" Category Spend Distribution"),
+            const SizedBox(height: 20),
+            _header("Spending Overview"),
+            const SizedBox(height: 8),
+            aggregatedSpending.when(
+              data: (data) => _buildSpendingOverview(context, data),
+              loading: () => const Center(child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              )),
+              error: (_, __) => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text("Unable to load spending data"),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            _header("Weekly Spending"),
+            const SizedBox(height: 8),
+            aggregatedSpending.when(
+              data: (data) => _buildWeeklyChart(context, data),
+              loading: () => const SizedBox(height: 200),
+              error: (_, __) => const SizedBox(height: 200),
+            ),
+
+            const SizedBox(height: 20),
+            _header("Category Breakdown"),
+            const SizedBox(height: 8),
+            aggregatedSpending.when(
+              data: (data) => _buildCategoryBreakdown(context, data),
+              loading: () => const Center(child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              )),
+              error: (_, __) => const SizedBox(),
+            ),
+
+            const SizedBox(height: 20),
+            _header("Category Spend Distribution"),
             StreamBuilder<QuerySnapshot>(
               stream: categoryStream,
               builder: (context, categorySnapshot) {
@@ -58,7 +118,10 @@ class InsightsScreen extends ConsumerWidget {
                   return const Center(child: Text("Error loading category data"));
                 }
                 if (!categorySnapshot.hasData || categorySnapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No Analytics yet"));
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text("No analytics yet. Start shopping to see insights!"),
+                  ));
                 }
 
                 final categoryDocs = categorySnapshot.data!.docs;
@@ -84,7 +147,7 @@ class InsightsScreen extends ConsumerWidget {
                       return PieChartSectionData(
                         color: Colors.primaries[categoryDocs.indexOf(categoryDoc) % Colors.primaries.length],
                         value: percentage,
-                        title: '${percentage.toStringAsFixed(1)}%',
+                        title: percentage >= 5 ? '${percentage.toStringAsFixed(0)}%' : '',
                         radius: 50,
                         titleStyle: GoogleFonts.poppins(
                           fontSize: 12,
@@ -108,192 +171,52 @@ class InsightsScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Column(
-                          children: categoryDocs.map((categoryDoc) {
-                            final categoryData = categoryDoc.data() as Map<String, dynamic>;
-                            final categoryName = categoryData["category"] as String;
-                            final totalSpendCategory = (categoryData["totalSpend"] as num?)?.toDouble() ?? 0.0;
-                            final percentage = totalBill > 0 ? (totalSpendCategory / totalBill) * 100 : 0.0;
-                            final color = Colors.primaries[categoryDocs.indexOf(categoryDoc) % Colors.primaries.length];
-                            
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    color: color,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text('$categoryName: ₹${totalSpendCategory.toStringAsFixed(2)} (${percentage.toStringAsFixed(1)}%)'),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('analytics')
-                              .doc(uid)
-                              .collection('itemStats')
-                              .snapshots(), // Fetch all item stats for client-side filtering
-                          builder: (context, itemStatsSnapshotInner) {
-                            if (itemStatsSnapshotInner.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                            if (itemStatsSnapshotInner.hasError) {
-                              return const Center(child: Text("Error loading item stats"));
-                            }
-
-                            final allItemStats = itemStatsSnapshotInner.hasData
-                                ? itemStatsSnapshotInner.data!.docs.map((doc) => doc.data() as Map<String, dynamic>).toList()
-                                : <Map<String, dynamic>>[];
-
-                            return Column(
-                              children: categoryDocs.map((categoryDoc) {
-                                final categoryData = categoryDoc.data() as Map<String, dynamic>;
-                                final categoryName = categoryData["category"] as String;
-                                final itemsPurchased = categoryData["itemsPurchased"] ?? 0;
-                                final avgSpend = categoryData["avgSpend"] ?? 0.0;
-                                final totalSpendCategory = (categoryData["totalSpend"] as num?)?.toDouble() ?? 0.0;
-                                final frequencyPerMonth = categoryData["frequencyPerMonth"] ?? 0;
-                                final purchaseHistory = categoryData["purchaseHistory"] as List<dynamic>? ?? [];
-
-                                // Calculate percentage of total bill
-                                final percentageOfTotalBill = totalBill > 0 ? (totalSpendCategory / totalBill) * 100 : 0.0;
-
-                                // Determine most frequent purchase day
-                                final mostFrequentDay = categoryStatsService.getMostFrequentPurchaseDay(purchaseHistory);
-
-                                // Find most frequently purchased item for this category
-                                final categoryItems = allItemStats
-                                    .where((item) => item["category"] == categoryName)
-                                    .toList();
-
-                                categoryItems.sort((a, b) => (b["timesPurchased"] ?? 0).compareTo(a["timesPurchased"] ?? 0));
-                                final mostBoughtItem = categoryItems.isNotEmpty ? categoryItems.first["item"] : 'N/A';
-
-                                return _categoryInsightCard(
-                                  context,
-                                  category: categoryName,
-                                  itemsPurchased: itemsPurchased,
-                                  avgSpend: avgSpend,
-                                  frequencyPerMonth: frequencyPerMonth,
-                                  mostBoughtItem: mostBoughtItem,
-                                  percentageOfTotalBill: percentageOfTotalBill,
-                                  mostFrequentPurchaseDay: mostFrequentDay,
-                                );
-                              }).toList(),
-                            );
-                          },
-                        ),
+                        ...categoryDocs.map((categoryDoc) {
+                          final categoryData = categoryDoc.data() as Map<String, dynamic>;
+                          final categoryName = categoryData["category"] as String;
+                          final totalSpendCategory = (categoryData["totalSpend"] as num?)?.toDouble() ?? 0.0;
+                          final percentage = totalBill > 0 ? (totalSpendCategory / totalBill) * 100 : 0.0;
+                          final color = Colors.primaries[categoryDocs.indexOf(categoryDoc) % Colors.primaries.length];
+                          
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                            child: Row(
+                              children: [
+                                Container(width: 12, height: 12, color: color),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text('$categoryName: ₹${totalSpendCategory.toStringAsFixed(2)} (${percentage.toStringAsFixed(1)}%)'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                       ],
                     );
                   },
                 );
               },
             ),
-            const SizedBox(height: 20),
-            _header("🧾 Frequent Purchase Summary"),
-            const SizedBox(height: 8),
-            StreamBuilder<QuerySnapshot>(
-              stream: categoryStream, // Use the existing categoryStream
-              builder: (context, categorySnapshot) {
-                if (categorySnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (categorySnapshot.hasError) {
-                  return const Center(child: Text("Error loading category data"));
-                }
-                if (!categorySnapshot.hasData || categorySnapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No Analytics yet"));
-                }
-
-                final categoryDocs = categorySnapshot.data!.docs;
-
-                return StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('analytics')
-                      .doc(uid)
-                      .collection('itemStats')
-                      .snapshots(), // Fetch all item stats for client-side filtering
-                  builder: (context, itemStatsSnapshotInner) {
-                    if (itemStatsSnapshotInner.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (itemStatsSnapshotInner.hasError) {
-                      return const Center(child: Text("Error loading item stats"));
-                    }
-
-                    final allItemStats = itemStatsSnapshotInner.hasData
-                        ? itemStatsSnapshotInner.data!.docs.map((doc) => doc.data() as Map<String, dynamic>).toList()
-                        : <Map<String, dynamic>>[];
-
-                    // Calculate overall most frequent category
-                    String mostFrequentCategory = 'N/A';
-                    double mostFrequentCategoryAvgSpend = 0.0;
-                    int maxFrequency = 0;
-
-                    for (var doc in categoryDocs) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final currentCategory = data["category"] as String;
-                      final currentFrequency = data["frequencyPerMonth"] ?? 0;
-                      if (currentFrequency > maxFrequency) {
-                        maxFrequency = currentFrequency;
-                        mostFrequentCategory = currentCategory;
-                        mostFrequentCategoryAvgSpend = data["avgSpend"] ?? 0.0;
-                      }
-                    }
-
-                    // Calculate overall most frequently purchased item
-                    String overallMostBoughtItem = 'N/A';
-                    int maxTimesPurchased = 0;
-
-                    for (var itemData in allItemStats) {
-                      final currentItem = itemData["item"] as String;
-                      final currentTimesPurchased = itemData["timesPurchased"] ?? 0;
-                      if (currentTimesPurchased > maxTimesPurchased) {
-                        maxTimesPurchased = currentTimesPurchased;
-                        overallMostBoughtItem = currentItem;
-                      }
-                    }
-
-                    // Hardcoded suggestions for the most frequent category (Fruits)
-                    List<String> suggestions = [];
-                    if (mostFrequentCategory.toLowerCase() == 'fruits') {
-                      suggestions = ['Apple', 'Orange', 'Grapes'];
-                    } else if (mostFrequentCategory.toLowerCase() == 'vegetables') {
-                      suggestions = ['Potato', 'Onion', 'Tomato'];
-                    } else {
-                      suggestions = ['No specific suggestions'];
-                    }
-
-
-                    return _frequentPurchaseSummaryCard(
-                      context,
-                      category: mostFrequentCategory,
-                      avgSpend: mostFrequentCategoryAvgSpend,
-                      mostBoughtItem: overallMostBoughtItem,
-                      suggestions: suggestions,
-                    );
-                  },
-                );
-              },
-            ),
 
             const SizedBox(height: 20),
-            _header("📍 Shopping Insights"),
+            _header("Shopping Insights"),
             const SizedBox(height: 8),
-
             StreamBuilder<DocumentSnapshot>(
               stream: shoppingInsightsStream,
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text("No shopping insights yet"),
+                  ));
                 }
                 final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                if (data.isEmpty) {
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text("Start shopping to see insights"),
+                  ));
+                }
                 return Column(
                   children: [
                     _insightCard(
@@ -320,9 +243,8 @@ class InsightsScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 20),
-            _header("🔥 Pantry Consumption Forecast"),
+            _header("Pantry Consumption Forecast"),
             const SizedBox(height: 8),
-
             StreamBuilder<QuerySnapshot>(
               stream: PantryService.pantryStream(),
               builder: (context, snapshot) {
@@ -333,11 +255,13 @@ class InsightsScreen extends ConsumerWidget {
                   return const Center(child: Text("Error loading pantry data"));
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No items in pantry yet"));
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text("No items in pantry yet"),
+                  ));
                 }
 
                 final items = snapshot.data!.docs;
-
                 return Column(
                   children: items.map((doc) {
                     final d = doc.data() as Map;
@@ -346,20 +270,386 @@ class InsightsScreen extends ConsumerWidget {
                       context,
                       icon: Icons.label_important_outline_rounded,
                       title: d["item"],
-                      value:
-                          "Est. Consumption: ${rate.toStringAsFixed(2)} days/unit",
+                      value: "Est. Consumption: ${rate.toStringAsFixed(2)} days/unit",
                     );
                   }).toList(),
                 );
               },
             ),
-            const SizedBox(height: 40)
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildSmartSpendSection(BuildContext context, List<SmartSpendSuggestion> suggestions) {
+    if (suggestions.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text("No suggestions at the moment"),
+      );
+    }
+
+    return Column(
+      children: suggestions.map((suggestion) => _smartSpendCard(context, suggestion)).toList(),
+    );
+  }
+
+  Widget _smartSpendCard(BuildContext context, SmartSpendSuggestion suggestion) {
+    final iconData = _getIconForSuggestion(suggestion.icon);
+    final color = _getColorForSuggestion(suggestion);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(iconData, color: color, size: 24),
+        ),
+        title: Text(
+          suggestion.title,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            suggestion.description,
+            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
+  IconData _getIconForSuggestion(String iconName) {
+    switch (iconName) {
+      case 'warning': return Icons.warning_amber_rounded;
+      case 'trending_up': return Icons.trending_up;
+      case 'savings': return Icons.savings;
+      case 'pie_chart': return Icons.pie_chart;
+      case 'error_outline': return Icons.error_outline;
+      case 'timeline': return Icons.timeline;
+      case 'inventory_2': return Icons.inventory_2;
+      case 'calendar_today': return Icons.calendar_today;
+      case 'thumb_up': return Icons.thumb_up;
+      default: return Icons.lightbulb_outline;
+    }
+  }
+
+  Color _getColorForSuggestion(SmartSpendSuggestion suggestion) {
+    switch (suggestion.type) {
+      case 'budget_alert':
+      case 'list_budget':
+        return Colors.red;
+      case 'spending_trend':
+        return suggestion.title.contains('Savings') ? Colors.green : Colors.orange;
+      case 'category_insight':
+        return Colors.blue;
+      case 'projection':
+        return Colors.deepOrange;
+      case 'bulk_buy':
+        return Colors.teal;
+      case 'pattern':
+        return Colors.purple;
+      default:
+        return Colors.green;
+    }
+  }
+
+  Widget _buildSpendingOverview(BuildContext context, AggregatedSpending data) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _statBox(
+                  context,
+                  "This Week",
+                  "₹${data.totalSpentThisWeek.toStringAsFixed(0)}",
+                  _getChangeIndicator(data.weekOverWeekChange),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _statBox(
+                  context,
+                  "This Month",
+                  "₹${data.totalSpentThisMonth.toStringAsFixed(0)}",
+                  data.totalBudgetThisMonth > 0
+                      ? "${data.budgetUtilization.toStringAsFixed(0)}% of budget"
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _statBox(
+                  context,
+                  "Daily Avg",
+                  "₹${data.averageDailySpend.toStringAsFixed(0)}",
+                  null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _statBox(
+                  context,
+                  "Items Bought",
+                  "${data.totalItemsPurchased}",
+                  "this month",
+                ),
+              ),
+            ],
+          ),
+          if (data.totalBudgetThisMonth > 0) ...[
+            const SizedBox(height: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Budget Utilization", style: GoogleFonts.poppins(fontSize: 13)),
+                    Text(
+                      "₹${data.totalSpentThisMonth.toStringAsFixed(0)} / ₹${data.totalBudgetThisMonth.toStringAsFixed(0)}",
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (data.budgetUtilization / 100).clamp(0, 1),
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation(_getBudgetColor(data.budgetUtilization)),
+                    minHeight: 8,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String? _getChangeIndicator(double change) {
+    if (change == 0) return null;
+    final sign = change > 0 ? '+' : '';
+    return '$sign${change.toStringAsFixed(0)}% vs last week';
+  }
+
+  Color _getBudgetColor(double utilization) {
+    if (utilization >= 100) return Colors.red;
+    if (utilization >= 80) return Colors.orange;
+    return Colors.green;
+  }
+
+  Widget _statBox(BuildContext context, String label, String value, String? subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+          const SizedBox(height: 4),
+          Text(value, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(subtitle, style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[500])),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyChart(BuildContext context, AggregatedSpending data) {
+    final maxAmount = data.weeklyBreakdown.map((d) => d.amount).fold(0.0, (a, b) => a > b ? a : b);
+    final double chartMax = maxAmount > 0 ? maxAmount * 1.2 : 100.0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SizedBox(
+        height: 200,
+        child: BarChart(
+          BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            maxY: chartMax,
+            barTouchData: BarTouchData(
+              enabled: true,
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                  return BarTooltipItem(
+                    '₹${rod.toY.toStringAsFixed(0)}',
+                    GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500),
+                  );
+                },
+              ),
+            ),
+            titlesData: FlTitlesData(
+              show: true,
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, meta) {
+                    final index = value.toInt();
+                    if (index >= 0 && index < data.weeklyBreakdown.length) {
+                      return Text(
+                        data.weeklyBreakdown[index].dayLabel,
+                        style: GoogleFonts.poppins(fontSize: 11),
+                      );
+                    }
+                    return const Text('');
+                  },
+                  reservedSize: 30,
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, meta) {
+                    if (value == 0) return const Text('');
+                    return Text(
+                      '₹${value.toInt()}',
+                      style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey),
+                    );
+                  },
+                  reservedSize: 45,
+                ),
+              ),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            borderData: FlBorderData(show: false),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: chartMax / 4,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: Colors.grey.withOpacity(0.2),
+                strokeWidth: 1,
+              ),
+            ),
+            barGroups: data.weeklyBreakdown.asMap().entries.map((entry) {
+              final index = entry.key;
+              final spending = entry.value;
+              final isToday = _isSameDay(spending.date, DateTime.now());
+              
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: spending.amount,
+                    color: isToday ? const Color(0xFF00B200) : Colors.blue,
+                    width: 24,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(4),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryBreakdown(BuildContext context, AggregatedSpending data) {
+    if (data.categorySpending.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text("No category data yet"),
+      );
+    }
+
+    final sortedCategories = data.categorySpending.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final total = data.categorySpending.values.fold(0.0, (a, b) => a + b);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: sortedCategories.take(5).map((entry) {
+          final percentage = total > 0 ? (entry.value / total * 100) : 0.0;
+          final colorIndex = sortedCategories.indexOf(entry);
+          final color = Colors.primaries[colorIndex % Colors.primaries.length];
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(width: 12, height: 12, color: color),
+                        const SizedBox(width: 8),
+                        Text(entry.key, style: GoogleFonts.poppins(fontSize: 14)),
+                      ],
+                    ),
+                    Text(
+                      "₹${entry.value.toStringAsFixed(0)} (${percentage.toStringAsFixed(0)}%)",
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: percentage / 100,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation(color),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
   Widget _header(String t) {
     return Padding(
@@ -370,41 +660,6 @@ class InsightsScreen extends ConsumerWidget {
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),
-      ),
-    );
-  }
-
-  Widget _frequentPurchaseSummaryCard(
-    BuildContext context, {
-    required String category,
-    required double avgSpend,
-    required String mostBoughtItem,
-    required List<String> suggestions,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "🧾 You frequently buy $category — Avg ₹${avgSpend.toStringAsFixed(2)}/month",
-            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "🍌 Most frequently purchased: $mostBoughtItem",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-          Text(
-            "🍎 Suggestions: ${suggestions.join(', ')}",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-        ],
       ),
     );
   }
@@ -446,55 +701,7 @@ class InsightsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _categoryInsightCard(
-    BuildContext context, {
-    required String category,
-    required int itemsPurchased,
-    required double avgSpend,
-    required int frequencyPerMonth,
-    required String mostBoughtItem,
-    required double percentageOfTotalBill,
-    required String mostFrequentPurchaseDay,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "$category ($itemsPurchased purchases)",
-            style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Spend avg: ₹${avgSpend.toStringAsFixed(2)}/month",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-          Text(
-            "Frequency: $frequencyPerMonth times/month",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-          Text(
-            "You often buy: $mostBoughtItem",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "You spend ${percentageOfTotalBill.toStringAsFixed(1)}% of your bill on ${category.toLowerCase()}",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "You usually buy ${category.toLowerCase()} items on $mostFrequentPurchaseDay",
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
-        ],
-      ),
-    );
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
