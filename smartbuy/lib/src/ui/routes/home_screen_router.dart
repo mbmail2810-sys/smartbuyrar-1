@@ -21,18 +21,9 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
     final mode = ref.watch(themeModeProvider);
     final authState = ref.watch(authStateProvider);
 
-    String welcomeMessage = 'Welcome';
-    authState.whenOrNull(
-      data: (user) {
-        if (user != null) {
-          welcomeMessage = 'Welcome, ${user.displayName ?? user.email ?? 'there'}!';
-        }
-      },
-    );
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(welcomeMessage),
+        title: const Text('SmartBuy'),
       ),
       drawer: Drawer(
         child: ListView(
