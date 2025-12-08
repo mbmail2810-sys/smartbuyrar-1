@@ -67,38 +67,55 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
         child: const Icon(Icons.add),
         onPressed: () => _showAddListDialog(context, ref),
       ),
-      body: listsAsync.when(
-        data: (lists) {
-          if (_lists.isEmpty) {
-            _lists.addAll(lists);
-          }
-
-          if (_lists.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset('assets/lottie/empty-cart.png', height: 120),
-                  const SizedBox(height: 10),
-                  const Text("No lists yet. Tap ➕ to create one!",
-                      style: TextStyle(fontSize: 16)),
-                ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+            child: Text(
+              'My Grocery List',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
               ),
-            );
-          }
+            ),
+          ),
+          Expanded(
+            child: listsAsync.when(
+              data: (lists) {
+                if (_lists.isEmpty) {
+                  _lists.addAll(lists);
+                }
 
-          return AnimatedList(
-            key: _listKey,
-            initialItemCount: _lists.length,
-            itemBuilder: (context, index, animation) {
-              if (index >= _lists.length) return Container();
-              final list = _lists[index];
-              return _buildAnimatedCard(context, list, animation);
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+                if (_lists.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset('assets/lottie/empty-cart.png', height: 120),
+                        const SizedBox(height: 10),
+                        const Text("No lists yet. Tap ➕ to create one!",
+                            style: TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                  );
+                }
+
+                return AnimatedList(
+                  key: _listKey,
+                  initialItemCount: _lists.length,
+                  itemBuilder: (context, index, animation) {
+                    if (index >= _lists.length) return Container();
+                    final list = _lists[index];
+                    return _buildAnimatedCard(context, list, animation);
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
+          ),
+        ],
       ),
     );
   }
