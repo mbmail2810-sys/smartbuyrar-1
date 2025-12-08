@@ -5,15 +5,16 @@ import '../../models/grocery_list.dart';
 import '../../providers/item_providers.dart';
 import '../../models/grocery_item.dart';
 import 'package:lottie/lottie.dart';
-import '../../providers/list_providers.dart' as list_providers; // Alias to avoid conflict
-import '../../providers/auth_providers.dart'; // Import for auth service
+import '../../providers/list_providers.dart' as list_providers;
+import '../../providers/auth_providers.dart';
 import '../../providers/reminders_provider.dart';
 import '../../providers/suggestion_provider.dart';
 import 'package:flutter/services.dart';
 import '../../core/utils.dart';
-import '../../services/pantry_service.dart'; // Import PantryService
-import '../../services/category_stats_service.dart'; // Import CategoryStatsService
-import '../../providers/budget_provider.dart'; // Import BudgetProvider
+import '../../services/pantry_service.dart';
+import '../../services/category_stats_service.dart';
+import '../../providers/budget_provider.dart';
+import '../widgets/share_list_bottom_sheet.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
   final String listId;
@@ -99,15 +100,23 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
               );
             },
           ),
-          if (user?.uid != null && listAsync.valueOrNull?.ownerId == user!.uid) 
+          if (listAsync.valueOrNull != null && listAsync.value!.canShare(user?.uid ?? ''))
             IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: () => _shareList(context, ref), // Implement _shareList
+              icon: const Icon(Icons.share, color: Colors.white),
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => ShareListBottomSheet(list: listAsync.value!),
+                );
+              },
             ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddItemDialog(context, ref),
-          ),
+          if (listAsync.valueOrNull != null && listAsync.value!.canEdit(user?.uid ?? ''))
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => _showAddItemDialog(context, ref),
+            ),
         ],
       ),
       body: CustomScrollView(

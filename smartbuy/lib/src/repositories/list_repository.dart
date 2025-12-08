@@ -156,13 +156,14 @@ class ListRepository {
     required String listId,
     required String listTitle,
     required String createdBy,
-    String role = 'member',
+    String role = 'editor',
   }) async {
+    final validRole = _validateRole(role);
     try {
       final ref = await _firestore.createInvite({
         'listId': listId,
         'listTitle': listTitle,
-        'role': role,
+        'role': validRole,
         'createdBy': createdBy,
       });
       return ref.id;
@@ -173,7 +174,7 @@ class ListRepository {
         data: {
           'listId': listId,
           'listTitle': listTitle,
-          'role': role,
+          'role': validRole,
           'createdBy': createdBy,
         },
       );
@@ -388,5 +389,57 @@ class ListRepository {
     }
 
     await listRef.update({'spent': totalSpent});
+  }
+
+  String _validateRole(String role) {
+    const validRoles = ['owner', 'editor', 'viewer'];
+    if (validRoles.contains(role)) return role;
+    if (role == 'member') return 'editor';
+    return 'viewer';
+  }
+
+  Future<String> createInviteWithEmail({
+    required String listId,
+    required String listTitle,
+    required String createdBy,
+    required String invitedUserEmail,
+    String role = 'editor',
+  }) async {
+    final validRole = _validateRole(role);
+    try {
+      final ref = await _firestore.createInvite({
+        'listId': listId,
+        'listTitle': listTitle,
+        'role': validRole,
+        'createdBy': createdBy,
+        'invitedUserEmail': invitedUserEmail,
+      });
+      return ref.id;
+    } catch (_) {
+      await _offline.queueOperation(
+        collectionPath: 'invites',
+        operation: OperationType.add,
+        data: {
+          'listId': listId,
+          'listTitle': listTitle,
+          'role': validRole,
+          'createdBy': createdBy,
+          'invitedUserEmail': invitedUserEmail,
+        },
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> addMember(String listId, String userId, MemberRole role) async {
+    await _firestore.addMemberToList(listId, userId, role);
+  }
+
+  Future<void> removeMember(String listId, String userId) async {
+    await _firestore.removeMemberFromList(listId, userId);
+  }
+
+  Future<void> updateMemberRole(String listId, String userId, MemberRole role) async {
+    await _firestore.updateMemberRole(listId, userId, role);
   }
 }

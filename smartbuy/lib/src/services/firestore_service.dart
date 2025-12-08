@@ -1,4 +1,3 @@
-// This is the firestore_service.dart file.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,14 +14,12 @@ class FirestoreService {
 
   CollectionReference get listsRef => db.collection('lists');
 
-  // Create new list
   Future<DocumentReference> createList(Map<String, dynamic> data) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('User not logged in');
     }
     data['createdAt'] = DateTime.now().millisecondsSinceEpoch;
-    // Ensure the owner is also a member
     if (data.containsKey('ownerId')) {
       final members = List<String>.from(data['members'] ?? []);
       final ownerId = data['ownerId'];
@@ -30,11 +27,11 @@ class FirestoreService {
         members.add(ownerId);
       }
       data['members'] = members;
+      data['memberRoles'] = {ownerId: 'owner'};
     }
     return await listsRef.add(data);
   }
 
-  // Watch all lists of a user
   Stream<List<GroceryList>> watchLists() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return listsRef.where('members', arrayContains: uid).snapshots().map(
@@ -43,7 +40,6 @@ class FirestoreService {
               ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
   }
 
-  // Watch a single list
   Stream<GroceryList> watchList(String listId) {
     return listsRef
         .doc(listId)
@@ -51,7 +47,6 @@ class FirestoreService {
         .map((snap) => GroceryList.fromDoc(snap));
   }
 
-  // Update a list
   Future<void> updateList(String listId, Map<String, dynamic> data) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -61,7 +56,6 @@ class FirestoreService {
     await listsRef.doc(listId).update(data);
   }
 
-  // Add item to a list
   Future<DocumentReference> addItem(
       String listId, Map<String, dynamic> data) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -69,20 +63,16 @@ class FirestoreService {
       throw Exception('User not logged in');
     }
     final itemsRef = listsRef.doc(listId).collection('items');
-    // Use Timestamp.now() for createdAt
     data['createdAt'] = Timestamp.now();
-    // createdBy is already expected to be in the 'data' map from item.toMap()
     return await itemsRef.add(data);
   }
 
-  // Watch items in list
   Stream<List<GroceryItem>> watchItems(String listId) {
     final itemsRef = listsRef.doc(listId).collection('items');
     return itemsRef.orderBy('createdAt').snapshots().map(
         (snap) => snap.docs.map((d) => GroceryItem.fromDoc(d)).toList());
   }
 
-  // Update an item in a list
   Future<void> updateItem(
       String listId, String itemId, Map<String, dynamic> data) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -117,7 +107,6 @@ class FirestoreService {
     await listsRef.doc(listId).collection('items').doc(itemId).delete();
   }
 
-  // Invites
   Future<DocumentReference> createInvite(Map<String, dynamic> data) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -125,6 +114,12 @@ class FirestoreService {
     }
     final invites = db.collection('invites');
     data['createdAt'] = DateTime.now().millisecondsSinceEpoch;
+    data['status'] = 'pending';
+    if (data.containsKey('role')) {
+      data['role'] = _validateRole(data['role'] as String? ?? 'viewer');
+    } else {
+      data['role'] = 'editor';
+    }
     return await invites.add(data);
   }
 
@@ -145,17 +140,35 @@ class FirestoreService {
     final listRef = db.collection('lists').doc(invite.listId);
     final inviteRef = db.collection('invites').doc(inviteId);
 
+    final validRole = _validateRole(invite.role);
+
     await db.runTransaction((txn) async {
       final listDoc = await txn.get(listRef);
       if (!listDoc.exists) return;
 
       txn.update(listRef, {
         'members': FieldValue.arrayUnion([userId]),
+        'memberRoles.$userId': validRole,
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
       });
 
-      txn.delete(inviteRef);
+      txn.update(inviteRef, {
+        'status': 'accepted',
+        'role': validRole,
+        'acceptedAt': DateTime.now().millisecondsSinceEpoch,
+      });
     });
+  }
+
+  String _validateRole(String role) {
+    const validRoles = ['owner', 'editor', 'viewer'];
+    if (validRoles.contains(role)) {
+      return role;
+    }
+    if (role == 'member') {
+      return 'editor';
+    }
+    return 'viewer';
   }
 
   Future<void> declineInvite(String inviteId) async {
@@ -163,16 +176,52 @@ class FirestoreService {
     if (user == null) {
       throw Exception('User not logged in');
     }
-    await db.collection('invites').doc(inviteId).delete();
+    await db.collection('invites').doc(inviteId).update({'status': 'declined'});
   }
 
   Stream<List<Invite>> getInvitesForUser(String email) {
     return db
         .collection('invites')
         .where('invitedUserEmail', isEqualTo: email)
+        .where('status', isEqualTo: 'pending')
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Invite.fromDoc(doc)).toList());
+  }
+
+  Future<void> addMemberToList(String listId, String userId, MemberRole role) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+    await listsRef.doc(listId).update({
+      'members': FieldValue.arrayUnion([userId]),
+      'memberRoles.$userId': role.name,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<void> removeMemberFromList(String listId, String userId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+    await listsRef.doc(listId).update({
+      'members': FieldValue.arrayRemove([userId]),
+      'memberRoles.$userId': FieldValue.delete(),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<void> updateMemberRole(String listId, String userId, MemberRole role) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+    await listsRef.doc(listId).update({
+      'memberRoles.$userId': role.name,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 
   Future<void> addReminder(String listId, Map<String, dynamic> data) async {
@@ -229,7 +278,6 @@ class FirestoreService {
     await listsRef.doc(listId).delete();
   }
 
-  // Generic methods
   Future<List<T>> getCollection<T>(String path,
       T Function(Map<String, dynamic>, String) fromFirestore) async {
     final snapshot = await db.collection(path).get();

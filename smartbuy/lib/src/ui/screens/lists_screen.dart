@@ -5,8 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'list_detail_screen.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/list_providers.dart';
-import '../../providers/item_providers.dart'; // Import item_providers
+import '../../providers/item_providers.dart';
 import '../../models/grocery_list.dart';
+import '../widgets/share_list_bottom_sheet.dart';
 
 class ListsScreen extends ConsumerStatefulWidget {
   const ListsScreen({super.key});
@@ -169,36 +170,28 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                   tag: list.id,
                   child: const Icon(Icons.list_alt, size: 32, color: Colors.green),
                 ),
-                trailing: isOwner
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.share),
-                            onPressed: () async {
-                              final scaffoldMessenger = ScaffoldMessenger.of(context);
-                              final user = ref.read(authStateProvider).value!;
-                              final repo = ref.read(listRepositoryProvider);
-                              final inviteId = await repo.createInvite(
-                                listId: list.id,
-                                listTitle: list.title,
-                                createdBy: user.uid,
-                              );
-                              final link = "smartbuy://invite/$inviteId";
-                              await Clipboard.setData(ClipboardData(text: link));
-                              if (!mounted) return;
-                              scaffoldMessenger.showSnackBar(
-                                SnackBar(content: Text('Invite link copied: $link')),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.redAccent),
-                            onPressed: () => _deleteList(context, ref, list),
-                          ),
-                        ],
-                      )
-                    : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (list.canShare(user?.uid ?? ''))
+                      IconButton(
+                        icon: const Icon(Icons.share, color: Color(0xFF00B200)),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => ShareListBottomSheet(list: list),
+                          );
+                        },
+                      ),
+                    if (isOwner)
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.redAccent),
+                        onPressed: () => _deleteList(context, ref, list),
+                      ),
+                  ],
+                ),
                 onTap: () {
                   Navigator.push(
                     context,
