@@ -1,9 +1,14 @@
-// This is the auth_service.dart file.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    clientId: kIsWeb ? '825686175806-rhu9g0t8imadpoo3brids43a5bgb28lh.apps.googleusercontent.com' : null,
+  );
 
   User? get currentUser {
     return _auth.currentUser;
@@ -20,24 +25,33 @@ class AuthService {
   }
 
   Future<UserCredential> signInWithGoogle() async {
-    final googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) throw Exception('Sign-in aborted by user');
-    final googleAuth = await googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    if (FirebaseAuth.instance.currentUser != null &&
-        FirebaseAuth.instance.currentUser!.isAnonymous) {
-      return await FirebaseAuth.instance.currentUser!
-          .linkWithCredential(credential);
-    } else {
-      return await FirebaseAuth.instance.signInWithCredential(credential);
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Sign-in aborted by user');
+      }
+      
+      final googleAuth = await googleUser.authentication;
+      
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      
+      if (_auth.currentUser != null && _auth.currentUser!.isAnonymous) {
+        return await _auth.currentUser!.linkWithCredential(credential);
+      } else {
+        return await _auth.signInWithCredential(credential);
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 
   Future<void> signOut() async {
-    await GoogleSignIn().signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
     await _auth.signOut();
   }
 }
