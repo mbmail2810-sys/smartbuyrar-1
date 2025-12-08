@@ -58,6 +58,18 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Atomic purchase logging with FieldValue.arrayUnion for collaboration
 
 ## Recent Changes
+- December 8, 2025: Pantry Consumption Forecast & Bug Fixes
+  - Redesigned Pantry Consumption Forecast section with rich cards showing:
+    - Item name and current quantity
+    - Status badges (In stock, Low stock, Expiring soon, Expired)
+    - Estimated days until item runs out based on consumption rate
+    - Expiration date with relative time formatting
+    - Color-coded borders and icons for quick status identification
+  - Fixed checkbox issue when marking items as purchased
+    - Added defensive type checking for usageLog parsing across multiple files
+    - Added try-catch blocks to prevent crashes from malformed data
+    - Made usageLog parsing safe in GroceryItem model, repository, and services
+
 - December 8, 2025: Insights Dashboard Enhancement
   - Added InsightsProvider for aggregated spending analytics across all lists
   - Implemented Smart Spend AI suggestions with local logic:

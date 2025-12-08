@@ -264,14 +264,8 @@ class InsightsScreen extends ConsumerWidget {
                 final items = snapshot.data!.docs;
                 return Column(
                   children: items.map((doc) {
-                    final d = doc.data() as Map;
-                    final rate = d["estimatedConsumptionRateDays"] ?? 0;
-                    return _insightCard(
-                      context,
-                      icon: Icons.label_important_outline_rounded,
-                      title: d["item"],
-                      value: "Est. Consumption: ${rate.toStringAsFixed(2)} days/unit",
-                    );
+                    final d = doc.data() as Map<String, dynamic>;
+                    return _buildPantryForecastCard(context, d);
                   }).toList(),
                 );
               },
@@ -699,6 +693,173 @@ class InsightsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildPantryForecastCard(BuildContext context, Map<String, dynamic> data) {
+    final itemName = data['item'] as String? ?? 'Unknown Item';
+    final quantity = (data['quantity'] as num?)?.toInt() ?? 0;
+    final consumptionRate = (data['estimatedConsumptionRateDays'] as num?)?.toDouble() ?? 0.0;
+    final lowStockThreshold = (data['lowStockThreshold'] as num?)?.toInt() ?? 2;
+    final expiresAtTimestamp = data['expiresAt'];
+    
+    DateTime? expiresAt;
+    if (expiresAtTimestamp != null) {
+      if (expiresAtTimestamp is Timestamp) {
+        expiresAt = expiresAtTimestamp.toDate();
+      } else if (expiresAtTimestamp is int) {
+        expiresAt = DateTime.fromMillisecondsSinceEpoch(expiresAtTimestamp);
+      }
+    }
+
+    final int daysUntilEmpty = consumptionRate > 0 
+        ? (quantity * consumptionRate).round() 
+        : -1;
+
+    final bool isLowStock = quantity <= lowStockThreshold;
+    final bool isExpiringSoon = expiresAt != null && 
+        expiresAt.difference(DateTime.now()).inDays <= 3;
+    final bool isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
+
+    Color statusColor = Colors.green;
+    String statusText = '';
+    IconData statusIcon = Icons.check_circle;
+
+    if (isExpired) {
+      statusColor = Colors.red;
+      statusText = 'Expired';
+      statusIcon = Icons.error;
+    } else if (isExpiringSoon) {
+      statusColor = Colors.orange;
+      statusText = 'Expiring soon';
+      statusIcon = Icons.warning;
+    } else if (isLowStock) {
+      statusColor = Colors.amber;
+      statusText = 'Low stock';
+      statusIcon = Icons.inventory_2;
+    } else if (quantity > 0) {
+      statusText = 'In stock';
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: isLowStock || isExpiringSoon || isExpired
+            ? Border.all(color: statusColor.withOpacity(0.5), width: 1.5)
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      itemName,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '$quantity ${quantity == 1 ? 'unit' : 'units'} remaining',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (statusText.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (daysUntilEmpty > 0 || expiresAt != null) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (daysUntilEmpty > 0) ...[
+                  Icon(Icons.timeline, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(
+                    daysUntilEmpty == 1 
+                        ? 'Runs out in ~1 day' 
+                        : 'Runs out in ~$daysUntilEmpty days',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (daysUntilEmpty > 0 && expiresAt != null)
+                  const SizedBox(width: 16),
+                if (expiresAt != null) ...[
+                  Icon(
+                    Icons.event, 
+                    size: 16, 
+                    color: isExpired || isExpiringSoon ? statusColor : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isExpired 
+                        ? 'Expired ${_formatDate(expiresAt)}'
+                        : 'Expires ${_formatDate(expiresAt)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: isExpired || isExpiringSoon ? statusColor : Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = date.difference(now).inDays;
+    
+    if (diff == 0) return 'today';
+    if (diff == 1) return 'tomorrow';
+    if (diff == -1) return 'yesterday';
+    if (diff > 0 && diff <= 7) return 'in $diff days';
+    if (diff < 0 && diff >= -7) return '${-diff} days ago';
+    
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
