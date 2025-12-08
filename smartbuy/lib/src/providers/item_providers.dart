@@ -19,13 +19,21 @@ final itemFamily = Provider.family<List<GroceryItem>, List<GroceryItem>>(
     return items.where((item) {
       if (item.usageLog == null || item.usageLog!.isEmpty) return false;
 
-      final ts = item.usageLog!.last['date'];
+      try {
+        final lastEntry = item.usageLog!.last;
+        final ts = lastEntry['date'];
+        if (ts == null) return false;
 
-      final lastDate = ts is Timestamp
-          ? ts.toDate()
-          : DateTime.fromMillisecondsSinceEpoch(ts);
+        final lastDate = ts is Timestamp
+            ? ts.toDate()
+            : ts is int
+                ? DateTime.fromMillisecondsSinceEpoch(ts)
+                : DateTime.now();
 
-      return DateTime.now().difference(lastDate).inDays >= 7;
+        return DateTime.now().difference(lastDate).inDays >= 7;
+      } catch (_) {
+        return false;
+      }
     }).toList();
   },
 );

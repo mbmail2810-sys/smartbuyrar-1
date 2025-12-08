@@ -85,7 +85,8 @@ class FirestoreService {
     final docData = snapshot.data();
 
     final usageLog = (docData?['usageLog'] as List<dynamic>?)
-            ?.map((e) => e as Map<String, dynamic>)
+            ?.map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
+            .where((e) => e.isNotEmpty)
             .toList() ??
         [];
 

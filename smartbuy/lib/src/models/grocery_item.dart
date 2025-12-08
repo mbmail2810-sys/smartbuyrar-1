@@ -63,7 +63,10 @@ class GroceryItem {
                 'price': (item['price'] as num?)?.toDouble() ?? 0.0,
               })
           .toList(),
-      usageLog: (data['usageLog'] as List?)?.cast<Map<String, dynamic>>(),
+      usageLog: (data['usageLog'] as List<dynamic>?)
+          ?.map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
+          .where((e) => e.isNotEmpty)
+          .toList(),
       createdAt: _parseTimestamp(data['createdAt']) ?? DateTime.now(),
       updatedAt: _parseTimestamp(data['updatedAt']),
       createdBy: data['createdBy'] ?? '', // Default to empty string if not found

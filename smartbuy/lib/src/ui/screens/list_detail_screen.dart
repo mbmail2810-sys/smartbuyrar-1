@@ -133,8 +133,15 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
     .where((item) {
       if (item.usageLog == null || item.usageLog!.isEmpty) return false;
 
-      final lastUsed = toDateTime(item.usageLog!.last['date']);
-      return DateTime.now().difference(lastUsed).inDays >= 7;
+      try {
+        final lastEntry = item.usageLog!.last;
+        final dateValue = lastEntry['date'];
+        if (dateValue == null) return false;
+        final lastUsed = toDateTime(dateValue);
+        return DateTime.now().difference(lastUsed).inDays >= 7;
+      } catch (_) {
+        return false;
+      }
     })
     .map((item) => Card(
           margin: const EdgeInsets.only(top: 8),
