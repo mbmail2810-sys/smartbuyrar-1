@@ -38,11 +38,11 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Color(0xFF00B200),
               ),
-              child: Text('SmartBuy'),
+              child: const Text('SmartBuy', style: TextStyle(color: Colors.white, fontSize: 24)),
             ),
             SwitchListTile(
               title: const Text("Dark Mode"),
