@@ -32,8 +32,20 @@ The app runs automatically via the configured workflow which serves the built Fl
 - Pantry tracking
 - Insights and analytics
 - Offline support with sync
+- **Real-Time Sharing & Collaboration**
+  - Share lists via email invitations
+  - Three-tier role system: Owner, Editor, Viewer
+  - Role-based access control (owners can share, editors can modify, viewers read-only)
+  - Real-time sync for collaborative shopping
 
 ## Recent Changes
+- December 8, 2025: Real-Time Sharing & Collaboration
+  - Added MemberRole enum with owner/editor/viewer roles
+  - Created ShareListBottomSheet widget for email-based invites
+  - Implemented role validation at service and repository layers
+  - Added role-based UI controls in lists and list detail screens
+  - Updated acceptInvite to write normalized roles back to documents
+
 - December 8, 2025: Initial setup on Replit
   - Extracted project from archive
   - Fixed SDK version compatibility (3.8.0)
