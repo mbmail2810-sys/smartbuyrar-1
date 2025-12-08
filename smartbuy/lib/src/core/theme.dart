@@ -23,6 +23,13 @@ class AppTheme {
         backgroundColor: primaryGreen,
         foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
+        toolbarHeight: 50,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: primaryGreen,
@@ -54,6 +61,13 @@ class AppTheme {
         backgroundColor: primaryGreen,
         foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
+        toolbarHeight: 50,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: primaryGreen,
