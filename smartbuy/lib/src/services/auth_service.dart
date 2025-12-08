@@ -25,32 +25,50 @@ class AuthService {
   }
 
   Future<UserCredential> signInWithGoogle() async {
-    try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        throw Exception('Sign-in aborted by user');
-      }
-      
-      final googleAuth = await googleUser.authentication;
-      
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      
-      if (_auth.currentUser != null && _auth.currentUser!.isAnonymous) {
-        return await _auth.currentUser!.linkWithCredential(credential);
-      } else {
-        return await _auth.signInWithCredential(credential);
-      }
-    } catch (e) {
-      rethrow;
+    if (kIsWeb) {
+      return await _signInWithGoogleWeb();
+    } else {
+      return await _signInWithGoogleNative();
+    }
+  }
+
+  Future<UserCredential> _signInWithGoogleWeb() async {
+    final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+    googleProvider.addScope('email');
+    googleProvider.addScope('profile');
+    
+    if (_auth.currentUser != null && _auth.currentUser!.isAnonymous) {
+      return await _auth.currentUser!.linkWithPopup(googleProvider);
+    } else {
+      return await _auth.signInWithPopup(googleProvider);
+    }
+  }
+
+  Future<UserCredential> _signInWithGoogleNative() async {
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw Exception('Sign-in aborted by user');
+    }
+    
+    final googleAuth = await googleUser.authentication;
+    
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    
+    if (_auth.currentUser != null && _auth.currentUser!.isAnonymous) {
+      return await _auth.currentUser!.linkWithCredential(credential);
+    } else {
+      return await _auth.signInWithCredential(credential);
     }
   }
 
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      if (!kIsWeb) {
+        await _googleSignIn.signOut();
+      }
     } catch (_) {}
     await _auth.signOut();
   }
