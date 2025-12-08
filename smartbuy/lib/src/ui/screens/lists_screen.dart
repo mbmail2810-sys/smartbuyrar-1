@@ -1,4 +1,3 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,31 +63,6 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("My Grocery Lists 🛒"),
-        actions: [
-          StreamBuilder<List<ConnectivityResult>>(
-            stream: Connectivity().onConnectivityChanged,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              final isConnected = !snapshot.data!.contains(ConnectivityResult.none);
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Icon(
-                  isConnected ? Icons.cloud_done : Icons.cloud_off,
-                  color: isConnected ? Colors.green : Colors.grey,
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authServiceProvider).signOut(),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () => _showAddListDialog(context, ref),
