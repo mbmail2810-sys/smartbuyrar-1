@@ -58,6 +58,14 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Atomic purchase logging with FieldValue.arrayUnion for collaboration
 
 ## Recent Changes
+- December 8, 2025: Authentication & Navigation Improvements
+  - Updated Google Sign-In to use Firebase Auth's signInWithPopup for better web compatibility
+  - Added Forgot Password route to GoRouter
+  - Implemented password reset functionality using Firebase Auth sendPasswordResetEmail
+  - Updated sign-in screen navigation to use GoRouter instead of Navigator
+  - Added success/error message display on forgot password screen
+  - Consistent UI styling matching sign-in screen design
+
 - December 8, 2025: Pantry Screen Enhancement & Bug Fixes
   - Completely redesigned Pantry Stock screen with color-coded cards:
     - Visual quantity display with color-coded badges (green/amber/orange/red)

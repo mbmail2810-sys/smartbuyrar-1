@@ -123,7 +123,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, "/forgot-password");
+                        GoRouter.of(context).push("/forgot-password");
                       },
                       child: Text(
                         "Forgot password?",
@@ -242,7 +242,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, "/register");
+                          GoRouter.of(context).push("/register");
                         },
                         child: Text(
                           "Sign up",
