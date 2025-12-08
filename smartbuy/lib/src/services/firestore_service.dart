@@ -69,8 +69,18 @@ class FirestoreService {
 
   Stream<List<GroceryItem>> watchItems(String listId) {
     final itemsRef = listsRef.doc(listId).collection('items');
-    return itemsRef.orderBy('createdAt').snapshots().map(
-        (snap) => snap.docs.map((d) => GroceryItem.fromDoc(d)).toList());
+    return itemsRef.snapshots().map((snap) {
+      final items = <GroceryItem>[];
+      for (final doc in snap.docs) {
+        try {
+          items.add(GroceryItem.fromDoc(doc));
+        } catch (e) {
+          print('Error parsing item ${doc.id}: $e');
+        }
+      }
+      items.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return items;
+    });
   }
 
   Future<void> updateItem(

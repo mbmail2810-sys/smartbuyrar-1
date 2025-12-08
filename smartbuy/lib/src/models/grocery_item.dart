@@ -47,29 +47,59 @@ class GroceryItem {
       };
 
   factory GroceryItem.fromDoc(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final rawData = doc.data();
+    if (rawData == null) {
+      return GroceryItem(
+        id: doc.id,
+        name: 'Unknown Item',
+        quantity: 1,
+        category: 'General',
+        createdAt: DateTime.now(),
+        createdBy: '',
+      );
+    }
+    
+    final data = rawData as Map<String, dynamic>;
+
+    List<Map<String, dynamic>>? parsedPriceHistory;
+    try {
+      parsedPriceHistory = (data['priceHistory'] as List<dynamic>?)
+          ?.map((item) {
+            if (item is! Map) return <String, dynamic>{};
+            return {
+              'date': _parseTimestamp(item['date']) ?? DateTime.now(),
+              'price': (item['price'] as num?)?.toDouble() ?? 0.0,
+            };
+          })
+          .where((e) => e.isNotEmpty)
+          .toList();
+    } catch (_) {
+      parsedPriceHistory = null;
+    }
+
+    List<Map<String, dynamic>>? parsedUsageLog;
+    try {
+      parsedUsageLog = (data['usageLog'] as List<dynamic>?)
+          ?.map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
+          .where((e) => e.isNotEmpty)
+          .toList();
+    } catch (_) {
+      parsedUsageLog = null;
+    }
 
     return GroceryItem(
       id: doc.id,
-      name: data['name'] ?? '',
-      description: data['description'] as String?,
+      name: data['name']?.toString() ?? '',
+      description: data['description']?.toString(),
       price: (data['price'] as num?)?.toDouble(),
       quantity: (data['quantity'] as num?)?.toInt() ?? 1,
-      category: data['category'] ?? 'General',
-      checked: data['checked'] ?? false,
-      priceHistory: (data['priceHistory'] as List<dynamic>?)
-          ?.map((item) => {
-                'date': _parseTimestamp(item['date']) ?? DateTime.now(),
-                'price': (item['price'] as num?)?.toDouble() ?? 0.0,
-              })
-          .toList(),
-      usageLog: (data['usageLog'] as List<dynamic>?)
-          ?.map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
-          .where((e) => e.isNotEmpty)
-          .toList(),
+      category: data['category']?.toString() ?? 'General',
+      checked: data['checked'] == true,
+      priceHistory: parsedPriceHistory,
+      usageLog: parsedUsageLog,
       createdAt: _parseTimestamp(data['createdAt']) ?? DateTime.now(),
       updatedAt: _parseTimestamp(data['updatedAt']),
-      createdBy: data['createdBy'] ?? '', // Default to empty string if not found
+      createdBy: data['createdBy']?.toString() ?? '',
     );
   }
 
