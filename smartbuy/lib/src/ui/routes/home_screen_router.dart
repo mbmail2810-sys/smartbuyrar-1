@@ -19,21 +19,6 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
     final mode = ref.watch(themeModeProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Grocery List'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await ref.read(authServiceProvider).signOut();
-              if (context.mounted) {
-                context.go('/sign-in');
-              }
-            },
-          ),
-        ],
-      ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
