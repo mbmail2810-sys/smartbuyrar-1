@@ -58,7 +58,20 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Atomic purchase logging with FieldValue.arrayUnion for collaboration
 
 ## Recent Changes
-- December 8, 2025: Authentication & Navigation Improvements
+- December 9, 2025: Lists Screen UI Redesign
+  - Completely redesigned home/lists screen with modern UI:
+    - Greeting header with time-based message (Good Morning/Afternoon/Evening)
+    - User name display and quick access buttons for Insights and Profile
+    - Search bar for filtering lists and items
+    - Categories section with horizontal scroll (Fruits, Vegetables, Dairy, Bakery, Meat, Beverages)
+    - Tab buttons for "My Lists" and "Shared" with item counts
+    - "+ New" button for creating lists
+    - Redesigned list cards with progress bar showing completion percentage
+    - Budget display on list cards when set
+    - More options menu (3-dot) for share and delete actions
+    - Bottom sheet dialog for creating new lists
+
+- December 9, 2025: Authentication & Navigation Improvements
   - Updated Google Sign-In to use Firebase Auth's signInWithPopup for better web compatibility
   - Added Forgot Password route to GoRouter
   - Implemented password reset functionality using Firebase Auth sendPasswordResetEmail
