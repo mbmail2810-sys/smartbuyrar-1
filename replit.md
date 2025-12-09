@@ -58,6 +58,15 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Atomic purchase logging with FieldValue.arrayUnion for collaboration
 
 ## Recent Changes
+- December 9, 2025: Profile Image Upload
+  - Added round profile picture with camera icon overlay on Profile screen
+  - Profile image appears above user name
+  - Camera icon button to select/change profile photo
+  - Image picker integration for gallery selection
+  - Images stored as base64 in Firestore for persistence
+  - Shows user initials when no photo is set
+  - Loading indicator during upload
+
 - December 9, 2025: Lists Screen UI Redesign
   - Completely redesigned home/lists screen with modern UI:
     - Greeting header with time-based message (Good Morning/Afternoon/Evening)
