@@ -14,7 +14,20 @@ class PantryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Pantry Stock")),
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: Text(
+          "Pantry Stock",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.grey.shade50,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+      ),
       body: _buildPantryList(context, ref),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showPantryItemDialog(
