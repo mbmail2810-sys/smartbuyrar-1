@@ -38,9 +38,19 @@ class InsightsScreen extends ConsumerWidget {
         .snapshots();
 
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text("Insights"),
+        title: Text(
+          "Insights",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.grey.shade50,
+        foregroundColor: Colors.black87,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
