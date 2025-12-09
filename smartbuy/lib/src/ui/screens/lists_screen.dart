@@ -655,144 +655,216 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
   void _showAddListDialog(BuildContext context, WidgetRef ref) {
     final titleCtl = TextEditingController();
     final budgetCtl = TextEditingController();
+    String selectedCategory = 'Fruits';
+    String selectedEmoji = '🍎';
+
+    final categories = [
+      {'name': 'Fruits', 'emoji': '🍎', 'color': const Color(0xFFFFEBEE)},
+      {'name': 'Vegetables', 'emoji': '🥬', 'color': const Color(0xFFE8F5E9)},
+      {'name': 'Dairy', 'emoji': '🧀', 'color': const Color(0xFFFFF3E0)},
+      {'name': 'Bakery', 'emoji': '🥐', 'color': const Color(0xFFFFF8E1)},
+      {'name': 'Meat', 'emoji': '🍖', 'color': const Color(0xFFFFEBEE)},
+      {'name': 'Beverages', 'emoji': '🥤', 'color': const Color(0xFFE3F2FD)},
+    ];
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (c) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(c).viewInsets.bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+      builder: (c) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(c).viewInsets.bottom,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Create New List',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: titleCtl,
-                decoration: InputDecoration(
-                  labelText: 'List Name',
-                  hintText: 'e.g. Weekly Groceries',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF00B200), width: 2),
+                const SizedBox(height: 20),
+                Text(
+                  'Create New List',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: budgetCtl,
-                decoration: InputDecoration(
-                  labelText: 'Budget (optional)',
-                  hintText: '₹0.00',
-                  prefixText: '₹ ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF00B200), width: 2),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: titleCtl,
+                  decoration: InputDecoration(
+                    labelText: 'List Name',
+                    hintText: 'e.g. Weekly Groceries',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00B200), width: 2),
+                    ),
                   ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(c),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 16),
+                Text(
+                  'Select Category',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: categories.map((cat) {
+                      final isSelected = selectedCategory == cat['name'];
+                      return GestureDetector(
+                        onTap: () {
+                          setModalState(() {
+                            selectedCategory = cat['name'] as String;
+                            selectedEmoji = cat['emoji'] as String;
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected 
+                                ? const Color(0xFF00B200).withOpacity(0.15)
+                                : cat['color'] as Color,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected
+                                ? Border.all(color: const Color(0xFF00B200), width: 2)
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                cat['emoji'] as String,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                cat['name'] as String,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                  color: isSelected ? const Color(0xFF00B200) : Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        side: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: budgetCtl,
+                  decoration: InputDecoration(
+                    labelText: 'Budget (optional)',
+                    hintText: '₹0.00',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00B200), width: 2),
+                    ),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(c),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final title = titleCtl.text.trim();
-                        if (title.isEmpty) return;
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final title = titleCtl.text.trim();
+                          if (title.isEmpty) return;
 
-                        final budget = double.tryParse(budgetCtl.text.trim());
-                        final auth = ref.read(authStateProvider).value!;
-                        final repo = ref.read(listRepositoryProvider);
-                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                          final budget = double.tryParse(budgetCtl.text.trim());
+                          final auth = ref.read(authStateProvider).value!;
+                          final repo = ref.read(listRepositoryProvider);
+                          final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-                        final listData = {
-                          'title': title,
-                          'ownerId': auth.uid,
-                          'members': [auth.uid],
-                          if (budget != null) 'budget': budget,
-                        };
+                          final listData = {
+                            'title': title,
+                            'ownerId': auth.uid,
+                            'members': [auth.uid],
+                            'category': selectedCategory,
+                            'categoryEmoji': selectedEmoji,
+                            if (budget != null) 'budget': budget,
+                          };
 
-                        Navigator.pop(c);
-                        await repo.safeCreateList(listData);
+                          Navigator.pop(c);
+                          await repo.safeCreateList(listData);
 
-                        if (mounted) {
-                          scaffoldMessenger.showSnackBar(const SnackBar(
-                            content: Text('List created successfully!'),
-                            duration: Duration(seconds: 2),
-                          ));
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00B200),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          if (mounted) {
+                            scaffoldMessenger.showSnackBar(const SnackBar(
+                              content: Text('List created successfully!'),
+                              duration: Duration(seconds: 2),
+                            ));
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00B200),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Create',
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      child: Text(
-                        'Create',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ),
