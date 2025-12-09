@@ -456,10 +456,17 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                             color: const Color(0xFFE8F5E9),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
-                            Icons.shopping_bag_outlined,
-                            color: Color(0xFF00B200),
-                            size: 24,
+                          child: Center(
+                            child: list.categoryEmoji != null && list.categoryEmoji!.isNotEmpty
+                                ? Text(
+                                    list.categoryEmoji!,
+                                    style: const TextStyle(fontSize: 24),
+                                  )
+                                : const Icon(
+                                    Icons.shopping_bag_outlined,
+                                    color: Color(0xFF00B200),
+                                    size: 24,
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 12),

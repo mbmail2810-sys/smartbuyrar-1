@@ -42,6 +42,8 @@ class GroceryList {
   final bool budgetControlEnabled;
   final String? lastAlertStatus;
   final List<Map<String, dynamic>>? purchaseLog;
+  final String? category;
+  final String? categoryEmoji;
   final int createdAt;
 
   GroceryList({
@@ -55,6 +57,8 @@ class GroceryList {
     this.budgetControlEnabled = false,
     this.lastAlertStatus,
     this.purchaseLog,
+    this.category,
+    this.categoryEmoji,
     required this.createdAt,
   }) : memberRoles = memberRoles ?? {};
 
@@ -90,6 +94,8 @@ class GroceryList {
     'budgetControlEnabled': budgetControlEnabled,
     'lastAlertStatus': lastAlertStatus,
     'purchaseLog': purchaseLog,
+    'category': category,
+    'categoryEmoji': categoryEmoji,
     'createdAt': createdAt,
   };
 
@@ -116,6 +122,8 @@ class GroceryList {
       budgetControlEnabled: data['budgetControlEnabled'] ?? false,
       lastAlertStatus: data['lastAlertStatus'] as String?,
       purchaseLog: (data['purchaseLog'] as List?)?.cast<Map<String, dynamic>>(),
+      category: data['category'] as String?,
+      categoryEmoji: data['categoryEmoji'] as String?,
       createdAt: _parseTimestamp(data['createdAt']),
     );
   }
@@ -131,6 +139,8 @@ class GroceryList {
     bool? budgetControlEnabled,
     String? lastAlertStatus,
     List<Map<String, dynamic>>? purchaseLog,
+    String? category,
+    String? categoryEmoji,
     int? createdAt,
   }) {
     return GroceryList(
@@ -144,6 +154,8 @@ class GroceryList {
       budgetControlEnabled: budgetControlEnabled ?? this.budgetControlEnabled,
       lastAlertStatus: lastAlertStatus ?? this.lastAlertStatus,
       purchaseLog: purchaseLog ?? this.purchaseLog,
+      category: category ?? this.category,
+      categoryEmoji: categoryEmoji ?? this.categoryEmoji,
       createdAt: createdAt ?? this.createdAt,
     );
   }
