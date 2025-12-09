@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:smartbuy/src/providers/auth_providers.dart';
+import 'package:smartbuy/src/providers/theme_provider.dart';
+import 'package:smartbuy/src/providers/preferences_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -11,15 +13,17 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _darkMode = false;
-  bool _pushNotifications = true;
-
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authServiceProvider);
     final user = auth.currentUser;
     final email = user?.email ?? 'No email';
     final displayName = user?.displayName ?? _extractNameFromEmail(email);
+
+    final themeMode = ref.watch(themeModeProvider);
+    final isDarkMode = themeMode == ThemeMode.dark;
+
+    final notificationsEnabled = ref.watch(notificationsEnabledProvider);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -80,8 +84,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 iconColor: Colors.deepPurple,
                 title: 'Dark Mode',
                 trailing: Switch(
-                  value: _darkMode,
-                  onChanged: (val) => setState(() => _darkMode = val),
+                  value: isDarkMode,
+                  onChanged: (val) {
+                    ref.read(themeModeProvider.notifier).toggleTheme();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          val ? 'Dark mode enabled' : 'Light mode enabled',
+                          style: GoogleFonts.poppins(),
+                        ),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF00B200),
+                      ),
+                    );
+                  },
                   activeColor: const Color(0xFF00B200),
                 ),
               ),
@@ -91,8 +108,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 iconColor: Colors.orange,
                 title: 'Push Notifications',
                 trailing: Switch(
-                  value: _pushNotifications,
-                  onChanged: (val) => setState(() => _pushNotifications = val),
+                  value: notificationsEnabled,
+                  onChanged: (val) {
+                    ref.read(notificationsEnabledProvider.notifier).toggle();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          val ? 'Notifications enabled' : 'Notifications disabled',
+                          style: GoogleFonts.poppins(),
+                        ),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF00B200),
+                      ),
+                    );
+                  },
                   activeColor: const Color(0xFF00B200),
                 ),
               ),
@@ -103,14 +133,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 icon: Icons.shield_outlined,
                 iconColor: const Color(0xFF00B200),
                 title: 'Privacy & Security',
-                onTap: () {},
+                onTap: () {
+                  _showInfoDialog(
+                    context,
+                    'Privacy & Security',
+                    'Your data is securely stored and encrypted. We never share your personal information with third parties.',
+                  );
+                },
               ),
               const SizedBox(height: 12),
               _buildAccountTile(
                 icon: Icons.help_outline,
                 iconColor: const Color(0xFF00B200),
                 title: 'Help & Support',
-                onTap: () {},
+                onTap: () {
+                  _showInfoDialog(
+                    context,
+                    'Help & Support',
+                    'Need help? Contact us at support@smartbuy.app or visit our help center for FAQs and tutorials.',
+                  );
+                },
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -307,6 +349,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Icon(Icons.chevron_right, color: Colors.grey[400]),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showInfoDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00B200),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'OK',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
