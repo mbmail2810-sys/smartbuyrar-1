@@ -826,7 +826,7 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () async {
+                        onPressed: () {
                           final title = titleCtl.text.trim();
                           if (title.isEmpty) return;
 
@@ -845,14 +845,19 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                           };
 
                           Navigator.pop(c);
-                          await repo.safeCreateList(listData);
-
-                          if (mounted) {
+                          
+                          repo.safeCreateList(listData).then((_) {
                             scaffoldMessenger.showSnackBar(const SnackBar(
                               content: Text('List created successfully!'),
                               duration: Duration(seconds: 2),
+                              backgroundColor: Color(0xFF00B200),
                             ));
-                          }
+                          }).catchError((e) {
+                            scaffoldMessenger.showSnackBar(SnackBar(
+                              content: Text('Creating list... will sync when online'),
+                              duration: Duration(seconds: 2),
+                            ));
+                          });
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00B200),
