@@ -20,6 +20,7 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
   int _selectedTab = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String? _selectedCategory;
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -156,13 +157,23 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
           controller: _searchController,
           onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
           decoration: InputDecoration(
-            hintText: 'Search items or lists...',
+            hintText: 'Search lists...',
             hintStyle: GoogleFonts.poppins(
               color: Colors.grey.shade400,
               fontSize: 14,
             ),
             prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-            suffixIcon: Icon(Icons.mic, color: Colors.grey.shade400),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.close, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchController.clear();
+                        _searchQuery = '';
+                      });
+                    },
+                  )
+                : null,
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
@@ -187,17 +198,18 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                   color: Colors.black87,
                 ),
               ),
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'See all',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF00B200),
+              if (_selectedCategory != null)
+                TextButton(
+                  onPressed: () => setState(() => _selectedCategory = null),
+                  child: Text(
+                    'Clear filter',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF00B200),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -208,6 +220,7 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
+              _buildCategoryItem('General', '🛒', const Color(0xFFE8F5E9)),
               _buildCategoryItem('Fruits', '🍎', const Color(0xFFFFEBEE)),
               _buildCategoryItem('Vegetables', '🥬', const Color(0xFFE8F5E9)),
               _buildCategoryItem('Dairy', '🧀', const Color(0xFFFFF3E0)),
@@ -222,31 +235,46 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
   }
 
   Widget _buildCategoryItem(String name, String emoji, Color bgColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(16),
+    final isSelected = _selectedCategory == name;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_selectedCategory == name) {
+            _selectedCategory = null;
+          } else {
+            _selectedCategory = name;
+          }
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF00B200) : bgColor,
+                borderRadius: BorderRadius.circular(16),
+                border: isSelected
+                    ? Border.all(color: const Color(0xFF00B200), width: 2)
+                    : null,
+              ),
+              child: Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 28)),
+              ),
             ),
-            child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF00B200) : Colors.grey.shade700,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade700,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -355,6 +383,13 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
           filteredLists = filteredLists
               .where((l) => l.title.toLowerCase().contains(_searchQuery))
               .toList();
+        }
+
+        if (_selectedCategory != null) {
+          filteredLists = filteredLists.where((l) {
+            final listCategory = l.category ?? 'General';
+            return listCategory == _selectedCategory;
+          }).toList();
         }
 
         if (filteredLists.isEmpty) {
