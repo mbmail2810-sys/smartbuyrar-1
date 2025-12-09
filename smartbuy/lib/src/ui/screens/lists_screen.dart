@@ -655,10 +655,11 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
   void _showAddListDialog(BuildContext context, WidgetRef ref) {
     final titleCtl = TextEditingController();
     final budgetCtl = TextEditingController();
-    String selectedCategory = 'Fruits';
-    String selectedEmoji = '🍎';
+    String selectedCategory = 'General';
+    String selectedEmoji = '🛒';
 
     final categories = [
+      {'name': 'General', 'emoji': '🛒', 'color': const Color(0xFFF5F5F5)},
       {'name': 'Fruits', 'emoji': '🍎', 'color': const Color(0xFFFFEBEE)},
       {'name': 'Vegetables', 'emoji': '🥬', 'color': const Color(0xFFE8F5E9)},
       {'name': 'Dairy', 'emoji': '🧀', 'color': const Color(0xFFFFF3E0)},
