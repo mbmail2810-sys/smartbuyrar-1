@@ -9,9 +9,9 @@ SmartBuy is a Flutter-based grocery shopping companion app that helps users orga
     - `main.dart` - Application entry point
     - `src/` - Core application code
       - `core/` - Theme, constants, Firebase initialization
-      - `models/` - Data models (grocery items, lists, users)
+      - `models/` - Data models (grocery items, lists, users, subscriptions)
       - `providers/` - Riverpod providers for state management
-      - `services/` - Firebase, auth, analytics services
+      - `services/` - Firebase, auth, analytics, subscription services
       - `ui/` - Screens, widgets, and routing
   - `build/web/` - Built Flutter web files (served by HTTP server)
   - `assets/` - Icons, fonts, and Lottie animations
@@ -21,6 +21,7 @@ SmartBuy is a Flutter-based grocery shopping companion app that helps users orga
 - **Language**: Dart 3.8.0
 - **State Management**: Flutter Riverpod
 - **Backend**: Firebase (Auth, Firestore)
+- **Payments**: Razorpay (INR)
 - **Routing**: GoRouter
 - **Charts**: fl_chart
 
@@ -32,6 +33,12 @@ The app runs automatically via the configured workflow which serves the built Fl
 - Grocery list management
 - Pantry tracking
 - Offline support with sync
+- **SaaS Subscription System (Razorpay)**
+  - Four-tier pricing: Free, Plus (₹99/mo), Family (₹199/mo), Pro (₹299/mo)
+  - Feature-based access control with paywall dialogs
+  - Razorpay payment gateway integration
+  - Subscription management in Profile screen
+  - Plan limits: lists, sharing, reminders, collaboration, AI insights
 - **Real-Time Sharing & Collaboration**
   - Share lists via WhatsApp with invite links
   - Three-tier role system: Owner, Editor, Viewer
@@ -57,7 +64,29 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Accurate historical data from purchase logs
   - Atomic purchase logging with FieldValue.arrayUnion for collaboration
 
+## Subscription Plans
+| Plan | Price (INR) | Features |
+|------|-------------|----------|
+| 🆓 Free | ₹0 | 1 List, Basic features, No sharing |
+| ⚡ Plus | ₹99/mo | 5 Lists, Share lists, Reminders, Budget tracking |
+| 👨‍👩‍👧 Family | ₹199/mo | Unlimited lists, Real-time collaboration, Family sharing |
+| 💎 Pro | ₹299/mo | Everything + AI Smart Insights, Cloud backup, Priority support |
+
 ## Recent Changes
+- December 10, 2025: SaaS Subscription System
+  - Implemented complete Razorpay payment integration
+  - Created subscription data model with plan tiers
+  - Built pricing/paywall UI screen with plan comparison
+  - Added feature lock logic with paywall dialogs
+  - Integrated subscription checks for list creation and sharing
+  - Dynamic subscription card on Profile screen
+  - Subscription service for Firestore billing schema
+
+- December 10, 2025: Performance Optimizations
+  - Optimistic list creation - lists appear instantly before Firestore confirms
+  - Fire-and-forget item addition - dialog closes immediately
+  - Improved checkbox state management with proper equality operators
+
 - December 9, 2025: Profile Image Upload
   - Added round profile picture with camera icon overlay on Profile screen
   - Profile image appears above user name
@@ -89,69 +118,27 @@ The app runs automatically via the configured workflow which serves the built Fl
   - Consistent UI styling matching sign-in screen design
 
 - December 8, 2025: Pantry Screen Enhancement & Bug Fixes
-  - Completely redesigned Pantry Stock screen with color-coded cards:
-    - Visual quantity display with color-coded badges (green/amber/orange/red)
-    - Status indicators: Well stocked, Low stock, Expiring soon, Expired, Out of stock
-    - Stock level progress bar showing current quantity vs threshold
-    - Expiration date display with friendly relative formatting
-    - Color-coded card borders for quick status identification
-    - Action buttons for "Use" and "Restock" with improved UX
-    - Empty state with helpful messaging
-  - Redesigned Pantry Consumption Forecast in Insights with rich cards showing:
-    - Item name and current quantity
-    - Status badges (In stock, Low stock, Expiring soon, Expired)
-    - Estimated days until item runs out based on consumption rate
-    - Expiration date with relative time formatting
-    - Color-coded borders and icons for quick status identification
+  - Completely redesigned Pantry Stock screen with color-coded cards
   - Fixed checkbox issue when marking items as purchased
-    - Added defensive type checking for usageLog parsing across multiple files
-    - Added try-catch blocks to prevent crashes from malformed data
-    - Made usageLog parsing safe in GroceryItem model, repository, and services
-
-- December 8, 2025: Insights Dashboard Enhancement
-  - Added InsightsProvider for aggregated spending analytics across all lists
-  - Implemented Smart Spend AI suggestions with local logic:
-    - Budget exhaustion alerts (90%+ utilization)
-    - Week-over-week spending trend analysis
-    - Category concentration warnings (40%+ of total)
-    - Per-list over-budget alerts
-    - Projected overspend calculations
-    - Bulk buying suggestions (3+ purchases of same item)
-    - Peak shopping day pattern detection
-  - Added weekly spending bar chart with fl_chart
-  - Added spending overview with 4-stat grid and budget utilization
-  - Timezone-aware date handling for accurate analytics
-  - Category field added to purchase log entries
-
-- December 8, 2025: Budget Notifications & Spending Trends
-  - Added budget notification system with warning (90%) and exceeded alerts
-  - Implemented mutex-based serialization for notification status persistence
-  - Added purchase logging at item check-off with atomic Firestore updates
-  - Created spending trends visualization showing 7-day spending patterns
-  - Added lastAlertStatus and purchaseLog fields to GroceryList model
-  - Defensive parsing for spending trends to handle legacy/malformed data
-
-- December 8, 2025: Real-Time Sharing & Collaboration
-  - Added MemberRole enum with owner/editor/viewer roles
-  - Created ShareListBottomSheet widget with WhatsApp sharing
-  - Implemented role validation at service and repository layers
-  - Added role-based UI controls in lists and list detail screens
-  - Updated acceptInvite to write normalized roles back to documents
-  - Changed sharing from email to WhatsApp with shareable invite links
+  - Added defensive type checking for usageLog parsing
 
 - December 8, 2025: Initial setup on Replit
   - Extracted project from archive
   - Fixed SDK version compatibility (3.8.0)
-  - Fixed DropdownButtonFormField initialValue parameter issue
   - Built Flutter web release
   - Configured HTTP server workflow for web serving
 
 ## Technical Notes
+- **Razorpay Integration**: Uses JavaScript interop for web checkout, stores subscription in Firestore /users/{uid}/subscription/current
+- **Feature Gates**: Subscription providers check plan limits before allowing actions
+- **Optimistic Updates**: List creation uses pre-generated Firestore IDs for instant UI feedback
 - **Notification spam prevention**: Uses static caches and Firestore-persisted lastAlertStatus with mutex-based write serialization
 - **Spending trends**: Uses purchaseLog entries (logged at time of purchase with exact price/quantity/category) for accurate historical data
 - **Atomic updates**: Purchase logging uses FieldValue.arrayUnion to prevent race conditions in collaborative environments
-- **Timezone handling**: Insights provider converts Firestore UTC timestamps to local time for accurate calendar day matching
-- **Week boundary handling**: Uses normalized midnight dates with explicit upper/lower bounds for accurate week-over-week comparisons
+
+## Environment Variables
+- `RAZORPAY_KEY_ID` - Razorpay API Key ID (stored as secret)
+- `RAZORPAY_KEY_SECRET` - Razorpay API Key Secret (stored as secret)
 
 ## Firebase Configuration
 The app uses Firebase for authentication and data storage. Firebase options are configured in `lib/firebase_options.dart`.

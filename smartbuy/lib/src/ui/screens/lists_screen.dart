@@ -6,8 +6,11 @@ import 'list_detail_screen.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/list_providers.dart';
 import '../../providers/item_providers.dart';
+import '../../providers/subscription_provider.dart';
 import '../../models/grocery_list.dart';
+import '../../models/subscription_model.dart';
 import '../widgets/share_list_bottom_sheet.dart';
+import '../widgets/paywall_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 class ListsScreen extends ConsumerStatefulWidget {
@@ -345,7 +348,7 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
 
   Widget _buildNewButton() {
     return GestureDetector(
-      onTap: () => _showAddListDialog(context, ref),
+      onTap: () => _handleCreateList(context, ref),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
@@ -368,6 +371,25 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
         ),
       ),
     );
+  }
+
+  void _handleCreateList(BuildContext context, WidgetRef ref) {
+    final listsAsync = ref.read(userListsProvider);
+    final currentListCount = listsAsync.valueOrNull?.length ?? 0;
+    final canCreate = ref.read(canCreateListProvider(currentListCount));
+    
+    if (!canCreate) {
+      final currentPlan = ref.read(currentPlanProvider);
+      showPaywallDialog(
+        context,
+        feature: 'More Lists',
+        requiredPlan: SubscriptionPlan.plus,
+        customMessage: 'You\'ve reached the limit of ${currentPlan.maxLists} list(s) on your ${currentPlan.displayName} plan. Upgrade to create more lists!',
+      );
+      return;
+    }
+    
+    _showAddListDialog(context, ref);
   }
 
   Widget _buildListsContent(AsyncValue<List<GroceryList>> listsAsync, String? userId) {
@@ -534,6 +556,16 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                           icon: Icon(Icons.more_vert, color: Colors.grey.shade400),
                           onSelected: (value) {
                             if (value == 'share' && list.canShare(userId ?? '')) {
+                              final canShare = ref.read(canShareProvider);
+                              if (!canShare) {
+                                showPaywallDialog(
+                                  context,
+                                  feature: 'List Sharing',
+                                  requiredPlan: SubscriptionPlan.plus,
+                                  customMessage: 'Upgrade to Plus plan or higher to share lists with others!',
+                                );
+                                return;
+                              }
                               showModalBottomSheet(
                                 context: context,
                                 isScrollControlled: true,

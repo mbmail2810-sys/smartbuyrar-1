@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:smartbuy/src/providers/auth_providers.dart';
 import 'package:smartbuy/src/providers/theme_provider.dart';
 import 'package:smartbuy/src/providers/preferences_provider.dart';
+import 'package:smartbuy/src/providers/subscription_provider.dart';
+import 'package:smartbuy/src/models/subscription_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -371,49 +374,76 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildSubscriptionCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF00B200).withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF00B200),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.workspace_premium, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Free Plan',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF00B200),
-                  ),
+    final subscription = ref.watch(userSubscriptionProvider);
+    final plan = subscription.valueOrNull?.plan ?? SubscriptionPlan.free;
+    
+    return GestureDetector(
+      onTap: () => context.push('/subscription'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: plan == SubscriptionPlan.free
+              ? null
+              : LinearGradient(
+                  colors: [const Color(0xFF00B200), const Color(0xFF00D100)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                Text(
-                  'Upgrade to unlock more features',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
+          color: plan == SubscriptionPlan.free ? const Color(0xFFE8F5E9) : null,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF00B200).withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: plan == SubscriptionPlan.free 
+                    ? const Color(0xFF00B200) 
+                    : Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                plan.emoji,
+                style: const TextStyle(fontSize: 24),
+              ),
             ),
-          ),
-          Icon(Icons.chevron_right, color: Colors.grey[400]),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${plan.displayName} Plan',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: plan == SubscriptionPlan.free 
+                          ? const Color(0xFF00B200) 
+                          : Colors.white,
+                    ),
+                  ),
+                  Text(
+                    plan == SubscriptionPlan.free 
+                        ? 'Upgrade to unlock more features'
+                        : plan.description,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: plan == SubscriptionPlan.free 
+                          ? Colors.grey[600] 
+                          : Colors.white.withOpacity(0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right, 
+              color: plan == SubscriptionPlan.free ? Colors.grey[400] : Colors.white,
+            ),
+          ],
+        ),
       ),
     );
   }

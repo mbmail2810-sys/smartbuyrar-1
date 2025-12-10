@@ -9,6 +9,7 @@ import 'package:smartbuy/src/ui/screens/sign_in_screen.dart';
 import 'package:smartbuy/src/ui/screens/invite_screen.dart';
 import 'package:smartbuy/src/ui/screens/pantry_screen.dart';
 import 'package:smartbuy/src/ui/screens/forgot_password_screen.dart';
+import 'package:smartbuy/src/ui/screens/subscription_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -24,6 +25,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/forgot-password',
       builder: (context, state) => const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: '/subscription',
+      builder: (context, state) => const SubscriptionScreen(),
     ),
     GoRoute(
       path: '/invite/:inviteId',
