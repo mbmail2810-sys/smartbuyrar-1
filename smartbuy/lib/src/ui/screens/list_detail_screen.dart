@@ -686,19 +686,29 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
                         createdBy: ref.read(authStateProvider).value!.uid,
                       );
 
+                      // Close dialog immediately for instant feedback
                       navigator.pop();
-                      await repo.safeAddItem(widget.listId, newItem);
-                      if (!context.mounted) return;
-                      _showSuccess(context);
+                      
+                      // Show quick snackbar confirmation instead of Lottie animation
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Item added!'),
+                          duration: Duration(seconds: 1),
+                          backgroundColor: Color(0xFF00B200),
+                        ),
+                      );
 
-                      final user = ref.read(authStateProvider).value;
-                      if (user != null) {
-                        await CategoryStatsService().updateCategoryStats(
-                          userId: user.uid,
-                          category: newItem.category,
-                          price: newItem.price ?? 0.0,
-                        );
-                      }
+                      // Fire-and-forget: add item in background
+                      repo.safeAddItem(widget.listId, newItem).then((_) {
+                        final user = ref.read(authStateProvider).value;
+                        if (user != null) {
+                          CategoryStatsService().updateCategoryStats(
+                            userId: user.uid,
+                            category: newItem.category,
+                            price: newItem.price ?? 0.0,
+                          );
+                        }
+                      });
                     },
               child: Text(isEdit ? 'Update' : 'Add'),
             ),
