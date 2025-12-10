@@ -40,33 +40,38 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
     ref.listen(listItemsProvider(widget.listId), (previous, next) {
       if (next.hasValue && next.value != null) {
         final newItems = next.value!;
-        if (newItems.length > _items.length) {
-          // Find the new item and its index
-          final newItem = newItems.firstWhere((item) => !_items.contains(item));
-          // For simplicity, we assume new items are added to the start.
-          // In a real app, you might need a more sophisticated diffing algorithm
-          // to find the exact insertion point.
-          _items.insert(0, newItem);
-          _listKey.currentState?.insertItem(0);
-        } else if (newItems.length < _items.length) {
-          // Handle removals
-          final removedItem = _items.firstWhere((item) => !newItems.contains(item));
-          final removedIndex = _items.indexOf(removedItem);
-          _items.removeAt(removedIndex);
-          _listKey.currentState?.removeItem(
-            removedIndex,
-            (context, animation) => ScaleTransition(
-              scale: animation,
-              child: _buildItemTile(removedItem, context, ref),
-            ),
-          );
-        } else {
-          // Handle updates (if necessary)
-          _items = newItems;
-          // You might want to find the updated item and refresh it,
-          // but for now, a simple state update might be enough if the item's widget rebuilds.
-          setState(() {});
+        final oldItemIds = _items.map((i) => i.id).toSet();
+        final newItemIds = newItems.map((i) => i.id).toSet();
+        
+        if (newItemIds.length > oldItemIds.length) {
+          // New item added
+          final addedIds = newItemIds.difference(oldItemIds);
+          for (final addedId in addedIds) {
+            final newItem = newItems.firstWhere((item) => item.id == addedId);
+            _items.insert(0, newItem);
+            _listKey.currentState?.insertItem(0);
+          }
+        } else if (newItemIds.length < oldItemIds.length) {
+          // Item removed
+          final removedIds = oldItemIds.difference(newItemIds);
+          for (final removedId in removedIds) {
+            final removedIndex = _items.indexWhere((item) => item.id == removedId);
+            if (removedIndex != -1) {
+              final removedItem = _items.removeAt(removedIndex);
+              _listKey.currentState?.removeItem(
+                removedIndex,
+                (context, animation) => ScaleTransition(
+                  scale: animation,
+                  child: _buildItemTile(removedItem, context, ref),
+                ),
+              );
+            }
+          }
         }
+        
+        // Always update _items with latest data to reflect property changes (like checked)
+        _items = newItems.toList();
+        setState(() {});
       }
     });
 
