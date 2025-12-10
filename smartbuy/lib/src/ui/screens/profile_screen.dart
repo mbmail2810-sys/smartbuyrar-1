@@ -52,6 +52,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _pickImage() async {
     try {
+      setState(() {
+        _isLoadingImage = true;
+      });
+
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 512,
@@ -59,13 +63,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         imageQuality: 70,
       );
 
-      if (image == null) return;
-
-      setState(() {
-        _isLoadingImage = true;
-      });
+      if (image == null) {
+        if (mounted) {
+          setState(() {
+            _isLoadingImage = false;
+          });
+        }
+        return;
+      }
 
       final Uint8List bytes = await image.readAsBytes();
+      
+      if (bytes.isEmpty) {
+        throw Exception('Failed to read image bytes');
+      }
+      
       final String base64Image = base64Encode(bytes);
 
       final user = FirebaseAuth.instance.currentUser;
@@ -88,15 +100,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
         }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingImage = false;
+          });
+        }
       }
     } catch (e) {
+      debugPrint('Error picking image: $e');
       if (mounted) {
         setState(() {
           _isLoadingImage = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update photo', style: GoogleFonts.poppins()),
+            content: Text('Failed to update photo: ${e.toString()}', style: GoogleFonts.poppins()),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
