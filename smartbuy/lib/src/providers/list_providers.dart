@@ -14,11 +14,45 @@ final listRepositoryProvider = Provider((ref) => ListRepository(
     ref.watch(offlineSyncServiceProvider),
     ref.watch(analyticsServiceProvider)));
 
-// Stream of grocery lists for logged in user
+// Optimistic lists state notifier for instant UI updates
+class OptimisticListsNotifier extends StateNotifier<List<GroceryList>> {
+  OptimisticListsNotifier() : super([]);
+
+  void addOptimisticList(GroceryList list) {
+    state = [list, ...state];
+  }
+
+  void removeOptimisticList(String listId) {
+    state = state.where((l) => l.id != listId).toList();
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final optimisticListsProvider =
+    StateNotifierProvider<OptimisticListsNotifier, List<GroceryList>>(
+        (ref) => OptimisticListsNotifier());
+
+// Stream of grocery lists for logged in user (merged with optimistic lists)
 final userListsProvider = StreamProvider.autoDispose<List<GroceryList>>((ref) {
   final auth = ref.watch(authStateProvider).value;
   if (auth == null) return const Stream.empty();
-  return ref.watch(listRepositoryProvider).watchLists();
+  
+  final optimisticLists = ref.watch(optimisticListsProvider);
+  final firestoreStream = ref.watch(listRepositoryProvider).watchLists();
+  
+  return firestoreStream.map((firestoreLists) {
+    // Remove optimistic lists that now exist in Firestore
+    final firestoreIds = firestoreLists.map((l) => l.id).toSet();
+    final pendingOptimistic = optimisticLists
+        .where((l) => !firestoreIds.contains(l.id))
+        .toList();
+    
+    // Merge: optimistic first, then Firestore lists
+    return [...pendingOptimistic, ...firestoreLists];
+  });
 });
 
 final groceryListProvider =

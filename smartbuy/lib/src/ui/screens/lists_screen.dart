@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'list_detail_screen.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/list_providers.dart';
@@ -868,30 +869,50 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                           final budget = double.tryParse(budgetCtl.text.trim());
                           final auth = ref.read(authStateProvider).value!;
                           final repo = ref.read(listRepositoryProvider);
-                          final scaffoldMessenger = ScaffoldMessenger.of(context);
+                          final firestore = ref.read(firestoreProvider);
+
+                          // Generate ID locally for instant display
+                          final tempId = firestore.listsRef.doc().id;
+                          
+                          // Create optimistic list for immediate UI update
+                          final optimisticList = GroceryList(
+                            id: tempId,
+                            title: title,
+                            ownerId: auth.uid,
+                            members: [auth.uid],
+                            memberRoles: {auth.uid: MemberRole.owner},
+                            category: selectedCategory,
+                            categoryEmoji: selectedEmoji,
+                            budget: budget,
+                            spent: 0,
+                            createdAt: DateTime.now().millisecondsSinceEpoch,
+                          );
+
+                          // Add to optimistic provider immediately
+                          ref.read(optimisticListsProvider.notifier).addOptimisticList(optimisticList);
+                          
+                          // Close dialog immediately
+                          Navigator.pop(c);
 
                           final listData = {
                             'title': title,
                             'ownerId': auth.uid,
                             'members': [auth.uid],
+                            'memberRoles': {auth.uid: 'owner'},
                             'category': selectedCategory,
                             'categoryEmoji': selectedEmoji,
                             if (budget != null) 'budget': budget,
                           };
-
-                          Navigator.pop(c);
                           
-                          repo.safeCreateList(listData).then((_) {
-                            scaffoldMessenger.showSnackBar(const SnackBar(
-                              content: Text('List created successfully!'),
-                              duration: Duration(seconds: 2),
-                              backgroundColor: Color(0xFF00B200),
-                            ));
+                          // Write to Firestore with pre-generated ID
+                          firestore.listsRef.doc(tempId).set({
+                            ...listData,
+                            'createdAt': FieldValue.serverTimestamp(),
+                          }).then((_) {
+                            // Remove from optimistic once Firestore confirms
+                            ref.read(optimisticListsProvider.notifier).removeOptimisticList(tempId);
                           }).catchError((e) {
-                            scaffoldMessenger.showSnackBar(SnackBar(
-                              content: Text('Creating list... will sync when online'),
-                              duration: Duration(seconds: 2),
-                            ));
+                            // Keep in optimistic state for offline support
                           });
                         },
                         style: ElevatedButton.styleFrom(
