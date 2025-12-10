@@ -136,6 +136,39 @@ The app runs automatically via the configured workflow which serves the built Fl
 - **Spending trends**: Uses purchaseLog entries (logged at time of purchase with exact price/quantity/category) for accurate historical data
 - **Atomic updates**: Purchase logging uses FieldValue.arrayUnion to prevent race conditions in collaborative environments
 
+## Production Payment Setup (IMPORTANT)
+For production deployment, the Razorpay payment flow requires server-side security:
+
+1. **Order Creation**: Deploy a Firebase Cloud Function to create orders via Razorpay Orders API:
+   ```javascript
+   // Cloud Function to create Razorpay order
+   exports.createRazorpayOrder = functions.https.onCall(async (data, context) => {
+     const Razorpay = require('razorpay');
+     const razorpay = new Razorpay({
+       key_id: process.env.RAZORPAY_KEY_ID,
+       key_secret: process.env.RAZORPAY_KEY_SECRET,
+     });
+     const order = await razorpay.orders.create({
+       amount: data.amount,
+       currency: 'INR',
+       receipt: data.userId,
+     });
+     return { orderId: order.id };
+   });
+   ```
+
+2. **Payment Verification**: Verify signature server-side before activating subscription:
+   ```javascript
+   const crypto = require('crypto');
+   const generatedSignature = crypto
+     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+     .update(orderId + '|' + paymentId)
+     .digest('hex');
+   const isValid = generatedSignature === razorpaySignature;
+   ```
+
+3. **Webhook Handling**: Configure Razorpay webhooks for reliable payment confirmation.
+
 ## Environment Variables
 - `RAZORPAY_KEY_ID` - Razorpay API Key ID (stored as secret)
 - `RAZORPAY_KEY_SECRET` - Razorpay API Key Secret (stored as secret)

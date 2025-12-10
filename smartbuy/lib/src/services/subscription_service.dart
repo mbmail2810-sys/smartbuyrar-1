@@ -3,6 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/subscription_model.dart';
 
+/// SmartBuy Subscription Service
+/// 
+/// PRODUCTION REQUIREMENTS:
+/// ========================
+/// For production deployment, the payment flow MUST be secured:
+/// 
+/// 1. ORDER CREATION: Move order creation to a Firebase Cloud Function
+///    that calls Razorpay Orders API with the secret key:
+///    POST https://api.razorpay.com/v1/orders
+///    
+/// 2. PAYMENT VERIFICATION: After checkout, verify the payment signature
+///    on the server using: 
+///    generated_signature = hmac_sha256(order_id + "|" + razorpay_payment_id, secret)
+///    
+/// 3. WEBHOOK HANDLING: Configure Razorpay webhooks to handle payment
+///    confirmations server-side for reliability.
+/// 
+/// Current implementation is for DEMO/DEVELOPMENT only.
 class SubscriptionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -64,11 +82,16 @@ class SubscriptionService {
         .set(UserSubscription.free().toMap());
   }
 
+  /// Creates order data for Razorpay checkout.
+  /// 
+  /// DEMO MODE: This generates a client-side order ID.
+  /// PRODUCTION: Replace with Cloud Function call that creates
+  /// orders via Razorpay Orders API and returns server-generated order_id.
   Future<Map<String, dynamic>> createOrder({
     required String userId,
     required SubscriptionPlan plan,
   }) async {
-    // For web, we'll create the order data that will be used by Razorpay checkout
+    // DEMO: Client-side order ID (replace with server-side order creation in production)
     final orderId = 'order_${DateTime.now().millisecondsSinceEpoch}_$userId';
     final amountInPaise = plan.priceInr * 100;
 
@@ -82,7 +105,7 @@ class SubscriptionService {
       'createdAt': FieldValue.serverTimestamp(),
     };
 
-    // Store the order in Firestore
+    // Store the order in Firestore for tracking
     await _firestore
         .collection('users')
         .doc(userId)
@@ -104,6 +127,12 @@ class SubscriptionService {
     };
   }
 
+  /// Verifies payment and activates subscription.
+  /// 
+  /// DEMO MODE: Activates subscription without signature verification.
+  /// PRODUCTION: Must verify Razorpay signature server-side before activation:
+  ///   signature = hmac_sha256(order_id + "|" + razorpay_payment_id, secret_key)
+  ///   Compare with razorpay_signature from checkout response.
   Future<bool> verifyAndActivateSubscription({
     required String userId,
     required String orderId,
@@ -112,6 +141,9 @@ class SubscriptionService {
     Map<String, dynamic>? paymentDetails,
   }) async {
     try {
+      // PRODUCTION TODO: Call Cloud Function to verify payment signature
+      // before activating subscription. Never trust client-side payment data.
+
       // Update order status
       await _firestore
           .collection('users')
