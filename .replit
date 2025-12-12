@@ -7,28 +7,6 @@ packages = ["flutter", "libarchive", "p7zip", "unzip"]
 expertMode = true
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "SmartBuy App"
-
-[[workflows.workflow]]
-name = "SmartBuy App"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd smartbuy/build/web && python3 -m http.server 5000 --bind 0.0.0.0"
-waitForPort = 5000
 
 [[ports]]
 localPort = 5000
